@@ -6027,48 +6027,6 @@ class SetupOverlay(QWidget):
 
         cards_lay.addWidget(gem_card)
 
-        # ── OpenRouter Card ──
-        or_card = QFrame()
-        or_card.setFixedSize(260, 160)
-        or_card.setStyleSheet("""
-            QFrame {
-                background: rgba(255, 255, 255, 0.02);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 16px;
-            }
-            QFrame:hover {
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            }
-        """)
-        or_card.setCursor(Qt.CursorShape.PointingHandCursor)
-        olay = QVBoxLayout(or_card)
-        olay.setContentsMargins(22, 18, 22, 18)
-        olay.setSpacing(4)
-
-        ot = QLabel("OpenRouter")
-        ot.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
-        ot.setStyleSheet("color: rgba(255,255,255,0.8); background: transparent; border: none;")
-        olay.addWidget(ot)
-
-        od = QLabel("Multiple Models")
-        od.setFont(QFont("Segoe UI", 9))
-        od.setStyleSheet("color: rgba(255,255,255,0.3); background: transparent; border: none;")
-        olay.addWidget(od)
-
-        od2 = QLabel("Optional · Secondary")
-        od2.setFont(QFont("Segoe UI", 9))
-        od2.setStyleSheet("color: rgba(255,255,255,0.2); background: transparent; border: none;")
-        olay.addWidget(od2)
-
-        olay.addStretch()
-
-        oc = QLabel("Configure Later →")
-        oc.setFont(QFont("Segoe UI", 11))
-        oc.setStyleSheet("color: rgba(255,255,255,0.35); background: transparent; border: none;")
-        olay.addWidget(oc)
-
-        cards_lay.addWidget(or_card)
         cards_lay.addStretch()
 
         lay.addLayout(cards_lay)
@@ -6161,7 +6119,7 @@ class SetupOverlay(QWidget):
 
         status_row.addStretch()
 
-        hint = QLabel("<a href='https://aistudio.google.com/app/apikey' style='color: rgba(0, 229, 255,0.5); text-decoration: none; font-size: 10px;'>Get API Key →</a>")
+        hint = QLabel("<a href='https://openrouter.ai/settings/keys' style='color: rgba(0, 229, 255,0.5); text-decoration: none; font-size: 10px;'>Get API Key →</a>")
         hint.setOpenExternalLinks(True)
         hint.setStyleSheet("background: transparent; border: none;")
         status_row.addWidget(hint)
@@ -6243,11 +6201,11 @@ class SetupOverlay(QWidget):
             self._auth_step += 1
         else:
             self._auth_timer.stop()
-            self._s3_status.setText("✓ Identity Verified")
+            self._s3_status.setText("✓ API key entered (not verified)")
             self._s3_status.setStyleSheet("color: #37ff5f; background: transparent; border: none;")
             self._s3_title.setText("✓ OpenRouter")
             self._s3_title.setStyleSheet("color: #37ff5f; background: transparent; border: none;")
-            self._s3_sub.setText("OpenRouter  ·  Ready")
+            self._s3_sub.setText("OpenRouter key saved  ·  Verified on first request")
             self._s3_sub.setStyleSheet("color: rgba(55,255,95,0.6); background: transparent; border: none;")
             self._key_input.setStyleSheet("""
                 QLineEdit {
@@ -6265,187 +6223,13 @@ class SetupOverlay(QWidget):
                     border-radius: 20px;
                 }
             """)
-            QTimer.singleShot(1800, self._show_or_prompt)
+            QTimer.singleShot(300, self._finish_single_provider_setup)
 
 
-    def _show_or_prompt(self):
-        """After OpenRouter verified, ask if user wants to add OpenRouter too."""
+    def _finish_single_provider_setup(self):
+        """Only one cloud provider remains; skip the obsolete second key form."""
         self._s3_box.hide()
-        page = self._stack.widget(6)
-        lay = page.layout()
-
-        self._or_prompt_widget = QFrame()
-        self._or_prompt_widget.setFixedSize(460, 200)
-        self._or_prompt_widget.setStyleSheet("""
-            QFrame {
-                background: rgba(8, 10, 16, 220);
-                border: 1px solid rgba(0, 229, 255, 0.15);
-                border-radius: 20px;
-            }
-        """)
-        prom_lay = QVBoxLayout(self._or_prompt_widget)
-        prom_lay.setContentsMargins(32, 28, 32, 24)
-        prom_lay.setSpacing(8)
-
-        q_title = QLabel("Secondary Intelligence")
-        q_title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-        q_title.setStyleSheet("color: #ffffff; background: transparent; border: none;")
-        prom_lay.addWidget(q_title)
-
-        q_sub = QLabel("Would you like to configure OpenRouter as well?\nThis is optional and can be done later in Settings.")
-        q_sub.setFont(QFont("Segoe UI", 10))
-        q_sub.setWordWrap(True)
-        q_sub.setStyleSheet("color: rgba(255,255,255,0.4); background: transparent; border: none;")
-        prom_lay.addWidget(q_sub)
-
-        prom_lay.addStretch()
-
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(12)
-
-        skip_btn = QPushButton("Skip")
-        skip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        skip_btn.setFixedHeight(42)
-        skip_btn.setFont(QFont("Segoe UI", 11))
-        skip_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: rgba(255,255,255,0.4);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 12px;
-                padding: 0 24px;
-            }
-            QPushButton:hover {
-                color: rgba(255,255,255,0.7);
-                border: 1px solid rgba(255,255,255,0.25);
-            }
-        """)
-        skip_btn.clicked.connect(self._skip_or)
-        btn_row.addWidget(skip_btn)
-
-        yes_btn = QPushButton("Configure OpenRouter")
-        yes_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        yes_btn.setFixedHeight(42)
-        yes_btn.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        yes_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(0, 229, 255, 0.1);
-                color: #00e5ff;
-                border: 1px solid rgba(0, 229, 255, 0.35);
-                border-radius: 12px;
-                padding: 0 24px;
-            }
-            QPushButton:hover {
-                background: rgba(0, 229, 255, 0.2);
-                border: 1px solid rgba(0, 229, 255, 0.6);
-            }
-        """)
-        yes_btn.clicked.connect(self._show_or_input)
-        btn_row.addWidget(yes_btn)
-
-        prom_lay.addLayout(btn_row)
-
-        lay.insertWidget(lay.count() - 1, self._or_prompt_widget, 0, Qt.AlignmentFlag.AlignCenter)
-
-    def _skip_or(self):
-        """User chose to skip OpenRouter, go to color selection."""
         self._or_key_value = ""
-        self._or_prompt_widget.hide()
-        self._show_color_stage()
-
-    def _show_or_input(self):
-        """User wants to add OpenRouter."""
-        self._or_prompt_widget.hide()
-        page = self._stack.widget(6)
-        lay = page.layout()
-
-        self._or_box = QFrame()
-        self._or_box.setFixedSize(480, 230)
-        self._or_box.setStyleSheet("""
-            QFrame {
-                background: rgba(8, 10, 16, 220);
-                border: 1px solid rgba(0, 229, 255, 0.2);
-                border-radius: 20px;
-            }
-        """)
-        or_blay = QVBoxLayout(self._or_box)
-        or_blay.setContentsMargins(32, 28, 32, 28)
-        or_blay.setSpacing(6)
-
-        or_title = QLabel("OpenRouter")
-        or_title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        or_title.setStyleSheet("color: rgba(255,255,255,0.8); background: transparent; border: none;")
-        or_blay.addWidget(or_title)
-
-        or_sub = QLabel("Paste your OpenRouter API Key")
-        or_sub.setFont(QFont("Segoe UI", 10))
-        or_sub.setStyleSheet("color: rgba(255,255,255,0.4); background: transparent; border: none;")
-        or_blay.addWidget(or_sub)
-
-        or_blay.addSpacing(12)
-
-        self._or_input = QLineEdit()
-        self._or_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._or_input.setPlaceholderText("sk-or-************************")
-        self._or_input.setFont(QFont("Consolas", 12))
-        self._or_input.setFixedHeight(48)
-        self._or_input.setStyleSheet("""
-            QLineEdit {
-                background: rgba(255, 255, 255, 0.03);
-                color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 12px;
-                padding: 0 16px;
-                letter-spacing: 1px;
-            }
-            QLineEdit:focus {
-                border: 1px solid rgba(0, 229, 255, 0.5);
-            }
-        """)
-        self._or_input.setText((self._defaults.get("openrouter_api_key") or "").strip())
-        or_blay.addWidget(self._or_input)
-
-        or_blay.addStretch()
-
-        or_btn_row = QHBoxLayout()
-        or_skip = QPushButton("Skip")
-        or_skip.setCursor(Qt.CursorShape.PointingHandCursor)
-        or_skip.setFixedHeight(42)
-        or_skip.setFont(QFont("Segoe UI", 11))
-        or_skip.setStyleSheet("""
-            QPushButton { background: transparent; color: rgba(255,255,255,0.4); border: none; }
-            QPushButton:hover { color: rgba(255,255,255,0.7); }
-        """)
-        or_skip.clicked.connect(self._skip_or)
-        or_btn_row.addWidget(or_skip)
-
-        or_save = QPushButton("Save & Continue")
-        or_save.setCursor(Qt.CursorShape.PointingHandCursor)
-        or_save.setFixedHeight(42)
-        or_save.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        or_save.setStyleSheet("""
-            QPushButton {
-                background: rgba(0, 229, 255, 0.1);
-                color: #00e5ff;
-                border: 1px solid rgba(0, 229, 255, 0.35);
-                border-radius: 12px;
-                padding: 0 24px;
-            }
-            QPushButton:hover {
-                background: rgba(0, 229, 255, 0.2);
-                border: 1px solid rgba(0, 229, 255, 0.6);
-            }
-        """)
-        or_save.clicked.connect(self._save_or_key)
-        or_btn_row.addWidget(or_save)
-
-        or_blay.addLayout(or_btn_row)
-
-        lay.insertWidget(lay.count() - 1, self._or_box, 0, Qt.AlignmentFlag.AlignCenter)
-
-    def _save_or_key(self):
-        self._or_key_value = self._or_input.text().strip()
-        self._or_box.hide()
         self._show_color_stage()
 
     def _show_color_stage(self):
@@ -9787,7 +9571,7 @@ class MainWindow(QMainWindow):
         if not API_FILE.exists(): return False
         try:
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
-            return bool(d.get("openrouter_api_key") or d.get("os_system"))
+            return bool(d.get("openrouter_api_key")) or bool(self._load_app_settings().get("offline_mode_enabled", False))
         except Exception:
             return False
 
@@ -12656,8 +12440,8 @@ class SystemConnectivityPage(QWidget):
             if widget is not None:
                 widget.blockSignals(True)
         try:
-                        self._or_status.setText("Connected" if api.get("openrouter_api_key") else "Not connected")
-                        self._or_key.setText(self._provider_key_preview(api.get("openrouter_api_key", "")))
+            self._or_status.setText("Configured" if api.get("openrouter_api_key") else "Not configured")
+            self._or_key.setText(self._provider_key_preview(api.get("openrouter_api_key", "")))
             
             prov = app.get("default_ai_provider", "OpenRouter")
             is_offline = bool(app.get("offline_mode_enabled", False))
