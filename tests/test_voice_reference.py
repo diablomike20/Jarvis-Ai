@@ -166,7 +166,7 @@ def test_real_ffmpeg_converts_only_synthetic_wav(private_dir, tmp_path):
         handle.setnchannels(2)
         handle.setsampwidth(2)
         handle.setframerate(44100)
-        handle.writeframes(b"\\x00\\x00\\x00\\x00" * (44100 * 4))
+        handle.writeframes(bytes(4) * (44100 * 4))
     dest = voice_reference.prepare_reference(source, start_seconds=0)
     assert voice_reference._check_pcm_clip(dest)
     with wave.open(str(dest), "rb") as ready:
