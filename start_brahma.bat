@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-title Brahma Evo - Launcher
+title Jarvis AI - Launcher
 cd /d "%~dp0"
 
 color 0E
@@ -12,7 +12,7 @@ echo  ^| __ )^|  _ \    / \  ^| ^| ^| ^|  \/  ^|  / \    / \  ^|_ _^|
 echo  ^|  _ \^| ^|_) ^|  / _ \ ^| ^|_^| ^| ^|\/^| ^| / _ \  / _ \  ^| ^| 
 echo  ^| ^|_) ^|  _ ^<  / ___ \^|  _  ^| ^|  ^| ^|/ ___ \/ ___ \ ^| ^| 
 echo  ^|____/^|_^| \_\/_/   \_\_^| ^|_^|_^|  ^|_/_/   \_\_/   \_\___^|
-echo                       BRAHMA EVO
+echo                       JARVIS AI
 echo          AUTONOMOUS SELF-EVOLUTION COGNITIVE ENGINE
 echo    [Skill Forge // Crucible Sandbox // 180 FPS HoloCore]
 echo ==========================================================================
