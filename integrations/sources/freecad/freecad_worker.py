@@ -90,6 +90,7 @@ def _sketch_pad(doc, args):
     if doc.getObject(args["name"]) is not None:
         raise ValueError("A megadott objektumnév már foglalt.")
     # A genuinely editable parametric PartDesign Pad, with an underlying sketch.
+    import PartDesign  # noqa: F401 (register PartDesign object types)
     import Sketcher  # noqa: F401
     body = doc.addObject("PartDesign::Body", args["name"])
     body.Label = args["name"]
@@ -207,6 +208,16 @@ def handle(job):
                 raise ValueError("A törlendő objektum nem létezik.")
             doc.removeObject(obj.Name)
             obj = None
+        elif op == "import_geometry":
+            file = Path(job["input_file"])
+            if file.suffix.lower() in (".step", ".stp", ".iges", ".igs", ".brep"):
+                Part.insert(str(file), doc.Name)
+            elif file.suffix.lower() in (".stl", ".obj"):
+                import Mesh
+                Mesh.insert(str(file), doc.Name)
+            else:
+                raise ValueError("Nem támogatott geometriaimport.")
+            obj = None
         elif op == "export":
             doc.recompute()
             return _export(doc, project_root, args)
@@ -218,8 +229,10 @@ def handle(job):
             raise ValueError("A művelet üres vagy hibás geometriát hozott létre.")
         doc.save()
         return {"project": project_file.name,
-                "result": _shape_information(obj) if obj is not None else
-                {"removed": args["name"]}}
+                "result": _shape_information(obj) if obj is not None else (
+                    {"imported": Path(job["input_file"]).name} if op == "import_geometry"
+                    else {"removed": args["name"]}
+                )}
     finally:
         App.closeDocument(doc.Name)
 
@@ -241,5 +254,4 @@ def main():
     result_file.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
-if __name__ == "__main__":
-    main()
+main()
