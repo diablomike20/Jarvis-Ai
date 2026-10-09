@@ -45,7 +45,7 @@ function Run-Checked {
     }
 }
 
-if (-not $IsWindows -and -not ($env:OS -eq "Windows_NT")) {
+if ($env:OS -ne "Windows_NT") {
     throw "This installer can only be built on Windows x64."
 }
 
