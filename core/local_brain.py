@@ -1,5 +1,5 @@
 """
-Brahma Local Brain Engine (v2)
+Jarvis AI Local Brain Engine (v2)
 Provides full offline local LLM execution using an OpenAI-compatible local runtime
 (Ollama, LM Studio, vLLM, or LocalAI) with automatic tool-calling and hardware acceleration.
 """
