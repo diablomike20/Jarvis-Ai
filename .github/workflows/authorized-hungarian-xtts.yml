@@ -1,0 +1,25 @@
+name: Authorized Hungarian XTTS routing checks
+
+on:
+  push:
+    branches:
+      - feature/jarvis-authorized-hu-xtts-integration
+  pull_request:
+    branches:
+      - feature/jarvis-ai-visual-rebrand
+
+jobs:
+  voice-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile integrated voice routing
+        run: |
+          python -m py_compile actions/jarvis_voice.py actions/attention_monitor.py main.py
+      - name: Install test runner only (no XTTS model or voice data)
+        run: python -m pip install -q pytest
+      - name: Run synthetic WAV and routing regression tests
+        run: python -m pytest -q tests/test_authorized_hungarian_voice.py
