@@ -1810,6 +1810,7 @@ TOOL_DECLARATIONS.append({
             "operation": {"type": "STRING", "description": "catalogue | status | discover | inspect | execute"},
             "filter": {"type": "STRING", "description": "Keyword for discover, e.g. layers, mask, develop, audio, timeline"},
             "limit": {"type": "INTEGER", "description": "Number of matching tools to list, max 60"},
+            "steps": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"tool": {"type": "STRING"}, "arguments": {"type": "OBJECT"}}}, "description": "Up to 8 MCP tool calls; each mutating batch requires on-screen consent."},
             "tool": {"type": "STRING", "description": "Exact MCP tool name returned from discover"},
             "arguments": {"type": "OBJECT", "description": "JSON arguments of the selected MCP tool"},
         },
@@ -2004,6 +2005,33 @@ class BrahmaLive:
         if getattr(self, "_email_mode", False):
             if self._handle_email_flow(text):
                 return
+
+        # Creative Studio: voice/text commands go through the local editor MCP
+        # registry; writes require the HUD confirmation issued by core.confirm.
+        try:
+            from actions.creative_intent import recognize_creative_intent
+            if recognize_creative_intent(text):
+                def _creative_job():
+                    from actions.creative_intent import handle_creative_text
+                    try:
+                        self.ui.set_state("THINKING")
+                        answer = handle_creative_text(text)
+                        self.ui.write_log(f"JARVIS Creative Studio: {answer}")
+                        if not self.ui.muted:
+                            if answer.startswith("[CONFIRMATION_PENDING]"):
+                                self.speak("A szerkesztési művelethez jóváhagyást kérek a képernyőn.")
+                            else:
+                                self.speak(answer[:380])
+                    except Exception as exc:
+                        self.ui.write_log(f"Creative Studio hiba: {exc}")
+                    finally:
+                        self.ui.set_state("LISTENING")
+                threading.Thread(
+                    target=_creative_job, daemon=True, name="jarvis-creative-studio"
+                ).start()
+                return
+        except Exception as exc:
+            self.ui.write_log(f"Creative Studio routing warning: {exc}")
 
         # Direct verbal toggle for Air-Gapped Offline Mode
         lower = text.lower().strip()
