@@ -68,6 +68,48 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
+def voice_readiness() -> dict[str, bool | str]:
+    """Cheap, side-effect-free status for the real JARVIS settings screen.
+
+    This only inspects packages and the WAV header. It NEVER loads XTTS,
+    contacts the network, plays speech, or discloses the private WAV path.
+    """
+    import importlib.util
+
+    try:
+        from memory import config_manager
+        enabled = config_manager.load_settings().get("jarvis_voice_enabled") is True
+    except Exception:
+        enabled = False
+    reference_ok = _valid_reference_wav(reference_wav_path())
+    deps = {}
+    for package in ("torch", "TTS"):
+        try:
+            deps[package] = importlib.util.find_spec(package) is not None
+        except (ImportError, ValueError, AttributeError):
+            deps[package] = False
+    supported = _is_windows()
+    can_enable = supported and reference_ok and all(deps.values())
+    if not supported:
+        reason = "A magyar XTTS hang csak Windows alatt támogatott."
+    elif not reference_ok:
+        reason = "Hiányzik az érvényes, engedélyezett PCM WAV referencia."
+    elif not all(deps.values()):
+        reason = "Hiányzik a torch vagy a coqui-tts (TTS) helyi függőség."
+    elif enabled:
+        reason = "Magyar XTTS bekapcsolva. Helyi hangpróba indítható."
+    else:
+        reason = "A helyi referencia és függőségek készen állnak."
+    return {
+        "enabled": enabled,
+        "reference_ok": reference_ok,
+        "dependencies_ok": all(deps.values()),
+        "windows": supported,
+        "can_enable": can_enable,
+        "reason": reason,
+    }
+
+
 @lru_cache(maxsize=1)
 def _load_model():
     """The first model download, if necessary, requires prior voice opt-in."""
