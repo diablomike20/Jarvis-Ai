@@ -1791,6 +1791,33 @@ TOOL_DECLARATIONS = [
 ]
 
 
+# Universal bridge to the genuine editor engines; the same command registry
+# exposes image, RAW and video editing tools without hardcoding their features.
+TOOL_DECLARATIONS.append({
+    "name": "creative_studio",
+    "description": (
+        "PhotoCraft, LightCraft and FilmCraft integrated Creative Studio. "
+        "Use for PSD layers/masks/filters, photo library/RAW processing/presets/"
+        "batch export, video timelines/transitions/keyframes/audio/captions/render. "
+        "First call operation='catalogue' or 'status', then 'discover' to find "
+        "the exact MCP tool and its arguments, then 'inspect' for safe reads or "
+        "'execute' for edits. Edits request a real on-screen confirmation."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "app": {"type": "STRING", "description": "photocraft | lightcraft | filmcraft | all (catalogue/status only)"},
+            "operation": {"type": "STRING", "description": "catalogue | status | discover | inspect | execute"},
+            "filter": {"type": "STRING", "description": "Keyword for discover, e.g. layers, mask, develop, audio, timeline"},
+            "limit": {"type": "INTEGER", "description": "Number of matching tools to list, max 60"},
+            "tool": {"type": "STRING", "description": "Exact MCP tool name returned from discover"},
+            "arguments": {"type": "OBJECT", "description": "JSON arguments of the selected MCP tool"},
+        },
+        "required": ["app", "operation"],
+    },
+})
+
+
 class BrahmaLive:
 
     def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
@@ -3765,6 +3792,15 @@ class BrahmaLive:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, undo_stack.undo_last)
             self.speak("Undone.")
+            self.ui.set_state("LISTENING")
+            return SimpleNamespace(name=name, id=fc.id, response={"result": result})
+
+        elif name == "creative_studio":
+            from actions.creative_studio import creative_studio
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, lambda: creative_studio(args, player=self.ui)
+            )
             self.ui.set_state("LISTENING")
             return SimpleNamespace(name=name, id=fc.id, response={"result": result})
 
