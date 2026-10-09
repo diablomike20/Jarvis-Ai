@@ -9,6 +9,7 @@ from __future__ import annotations
 from core.user_paths import get_user_data_dir
 
 import ast
+import hashlib
 import json
 import logging
 import os
@@ -28,6 +29,12 @@ CONFIG_DIR = get_user_data_dir() / "config"
 PATCH_HISTORY_FILE = CONFIG_DIR / "patch_history.json"
 BACKUPS_DIR = CONFIG_DIR / "patch_backups"
 API_CONFIG_PATH = CONFIG_DIR / "api_keys.json"
+# Files that must not be rewritten automatically by an LLM patch.
+PROTECTED_CORE_FILES = frozenset({
+    "main.py", "auto_heal_engine.py", "confirm.py", "skill_crucible.py",
+    "skill_forge.py", "dynamic_registry.py", "user_paths.py",
+    "plugin_manager.py", "executor.py", "updater.py",
+})
 
 
 
@@ -92,7 +99,7 @@ class TracebackAnalyzer:
                             resolved = c2
                             break
 
-            if resolved and resolved.exists():
+            if resolved and resolved.exists() and resolved.is_relative_to(BASE_DIR.resolve()):
                 # Check immunity
                 if resolved.name in PROTECTED_CORE_FILES:
                     logger.warning(f"[AutoHeal] File '{resolved.name}' is core-protected and cannot be patched.")
@@ -208,11 +215,11 @@ class AutoHealEngine:
         cls,
         traceback_text: str,
         context_notes: str = "",
-        dry_run: bool = False,
+        dry_run: bool = True,
     ) -> Dict[str, Any]:
         """
         Analyzes a traceback, pinpoints the root cause, synthesizes a patch,
-        verifies AST syntax in memory, and safely applies it with backup.
+        verifies AST syntax in memory, and returns an inert reviewed proposal.
         """
         parsed = TracebackAnalyzer.parse(traceback_text)
         if not parsed.get("success"):
@@ -279,61 +286,68 @@ class AutoHealEngine:
                 "parsed": parsed,
             }
 
-        if dry_run:
-            return {
-                "success": True,
-                "dry_run": True,
-                "target_file": str(target_path),
-                "explanation": explanation,
-                "target_chunk": target_chunk,
-                "replacement_chunk": replacement_chunk,
-                "message": f"Dry-run passed syntax validation for {target_path.name}.",
-            }
-
-        # Create atomic backup
-        backup_path = SafetySandbox.create_backup(target_path)
-
-        # Write patch to disk
-        try:
-            with open(target_path, "w", encoding="utf-8") as f:
-                f.write(staged_source)
-        except Exception as e:
-            # Immediate rollback if write failed
-            shutil.copy2(backup_path, target_path)
-            return {"success": False, "message": f"File write failed, restored backup: {e}"}
-
-        # Verify on-disk compilation via py_compile
-        try:
-            py_compile.compile(str(target_path), doraise=True)
-        except Exception as pyc_err:
-            logger.error(f"[AutoHeal] py_compile failed after write, rolling back: {pyc_err}")
-            shutil.copy2(backup_path, target_path)
-            return {"success": False, "message": f"Post-write compilation failed, rolled back: {pyc_err}"}
-
-        patch_id = str(uuid.uuid4())[:8]
-        entry = {
-            "patch_id": patch_id,
-            "timestamp": time.time(),
-            "target_file": str(target_path),
-            "backup_path": str(backup_path),
-            "line_number": line_num,
-            "exception_fixed": f"{parsed.get('exception_type')}: {parsed.get('exception_message')}",
-            "explanation": explanation,
-            "status": "applied",
-        }
-
-        history = SafetySandbox._load_history()
-        history.append(entry)
-        SafetySandbox._save_history(history)
-
+        # Never edit source code here; even callers passing dry_run=False only
+        # receive a reviewable proposal. Only the trusted HUD can apply it.
         return {
             "success": True,
-            "patch_id": patch_id,
+            "dry_run": True,
             "target_file": str(target_path),
-            "backup_path": str(backup_path),
+            "source_sha256": hashlib.sha256(full_source.encode("utf-8")).hexdigest(),
             "explanation": explanation,
-            "message": f"Successfully auto-patched '{target_path.name}' at line {line_num} (Patch ID: {patch_id}). Backup preserved.",
+            "target_chunk": target_chunk,
+            "replacement_chunk": replacement_chunk,
+            "line_number": line_num,
+            "exception_fixed": f"{parsed.get('exception_type')}: {parsed.get('exception_message')}",
+            "message": f"Javítási javaslat elkészült ehhez: {target_path.name}. Jóváhagyás szükséges.",
         }
+
+    @classmethod
+    def apply_reviewed_patch(cls, preview: dict) -> Dict[str, Any]:
+        """Apply *the exact* user-approved patch after guarding source changes."""
+        try:
+            target = Path(preview["target_file"]).resolve()
+            if not target.is_relative_to(BASE_DIR.resolve()):
+                return {"success": False, "message": "Kódmódosítás csak a JARVIS gyökér alatt engedélyezett."}
+            if target.name in PROTECTED_CORE_FILES or target.suffix != ".py":
+                return {"success": False, "message": "A célfájl védett."}
+            old = target.read_text(encoding="utf-8")
+            if hashlib.sha256(old.encode("utf-8")).hexdigest() != preview.get("source_sha256"):
+                return {"success": False, "message": "A célfájl megváltozott a jóváhagyás óta."}
+            before = preview.get("target_chunk")
+            after = preview.get("replacement_chunk")
+            if (not isinstance(before, str) or not before or
+                    not isinstance(after, str) or before not in old):
+                return {"success": False, "message": "Érvénytelen vagy már módosult javítási részlet."}
+            modified = old.replace(before, after, 1)
+            valid, err = SafetySandbox.validate_code(modified, file_name=str(target))
+            if not valid:
+                return {"success": False, "message": f"Szintaktikai hiba: {err}"}
+            backup = SafetySandbox.create_backup(target)
+            try:
+                target.write_text(modified, encoding="utf-8")
+                py_compile.compile(str(target), doraise=True)
+            except Exception as exc:
+                shutil.copy2(backup, target)
+                return {"success": False,
+                        "message": f"A javítás hibás volt, a mentés visszaállítva: {exc}"}
+            patch_id = uuid.uuid4().hex[:8]
+            history = SafetySandbox._load_history()
+            history.append({
+                "patch_id": patch_id,
+                "timestamp": time.time(),
+                "target_file": str(target),
+                "backup_path": str(backup),
+                "line_number": preview.get("line_number"),
+                "exception_fixed": preview.get("exception_fixed"),
+                "explanation": str(preview.get("explanation") or "")[:500],
+                "status": "applied",
+            })
+            SafetySandbox._save_history(history)
+            return {"success": True, "patch_id": patch_id,
+                    "message": f"Jóváhagyott javítás alkalmazva: {target.name} ({patch_id}). "
+                               "Mentés és visszaállítás rendelkezésre áll."}
+        except (OSError, KeyError, ValueError, TypeError) as exc:
+            return {"success": False, "message": f"Javítás elutasítva: {exc}"}
 
     @classmethod
     def _synthesize_patch_code(
@@ -461,11 +475,27 @@ def auto_heal(
                 speak(msg)
             return msg
 
-        res = AutoHealEngine.heal_traceback(tb, context_notes=notes)
-        msg = res.get("message", "Done.")
-        if speak:
-            speak(msg)
-        return msg
+        res = AutoHealEngine.heal_traceback(tb, context_notes=notes, dry_run=True)
+        msg = res.get("message", "A javítási terv nem készült el.")
+        if not res.get("success"):
+            if speak:
+                speak(msg)
+            return msg
+        from core.confirm import request
+        target = Path(res["target_file"]).name
+        detail = (
+            f"AI-kódjavítás: {target}. Magyarázat: {res.get('explanation', '')[:300]}. "
+            f"Régi részlet: {res['target_chunk'][:320]}. "
+            f"Új részlet: {res['replacement_chunk'][:320]}. "
+            "A teljes diff jóváhagyás előtt a forrásfájlban ellenőrizhető. "
+            "A javítás szintaktikailag tesztelt, de működése nem garantált."
+        )
+        return request(
+            "review-auto-heal-" + uuid.uuid4().hex[:12],
+            "JARVIS forráskódjavítás jóváhagyása",
+            detail,
+            lambda: AutoHealEngine.apply_reviewed_patch(res)["message"],
+        )
 
     elif action in ("learn_rule", "add_rule", "remember_rule"):
         rule = params.get("rule") or params.get("directive") or params.get("text") or ""

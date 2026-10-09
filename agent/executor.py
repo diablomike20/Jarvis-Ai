@@ -58,6 +58,18 @@ def _run_skill_forge(
             speak(message)
         return message
 
+    if result.get("pending"):
+        info = (
+            f"A skilltervezet elkészült: {result.get('name', 'new_feature')}. "
+            "Az új kód még nem futott. A képernyős jóváhagyás és "
+            "a tesztek után lesz elérhető."
+        )
+        if player and hasattr(player, "write_log"):
+            player.write_log(info)
+        if speak:
+            speak(info)
+        return info
+
     name = str(result.get("name") or skill_name or "new_feature")
     description = str(result.get("description") or "")
     announcement = f"⚡ [Brahma Evo] Synthesized and activated feature '{name}'. {description}".strip()
