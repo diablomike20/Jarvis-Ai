@@ -11400,8 +11400,9 @@ class SystemConnectivityPage(QWidget):
         self._hu_voice_import_worker = worker
         worker.completed.connect(self._on_hu_voice_import_completed)
         worker.finished.connect(worker.deleteLater)
-        self._refresh_hu_voice_controls()
         worker.start()
+        self._refresh_hu_voice_controls()
+        self._hu_voice_status_lbl.setText("A hangminta helyi feldolgozása folyamatban…")
 
     def _on_hu_voice_import_completed(self, ok: bool, message: str):
         self._hu_voice_import_worker = None
@@ -11441,6 +11442,9 @@ class SystemConnectivityPage(QWidget):
                 return
         try:
             config_manager.set_setting("jarvis_voice_enabled", bool(enabled))
+            # config_manager currently catches disk errors internally; verify persistence.
+            if config_manager.get_setting("jarvis_voice_enabled") is not bool(enabled):
+                raise OSError("Voice setting was not persisted")
             if not enabled:
                 from actions.jarvis_voice import stop_authorized_hungarian
                 stop_authorized_hungarian()
