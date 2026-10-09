@@ -2898,10 +2898,7 @@ class BrahmaLive:
     def _announce_attention(self, event: dict):
         msg = self._attention_message(event)
         self.ui.write_log(f"Brahma Evo: {msg}")
-        if self.session and self._loop:
-            self.speak(msg)
-        else:
-            threading.Thread(target=speak_native, args=(msg,), daemon=True).start()
+        self.speak(msg)
         self.ui.show_attention_alert(event)
 
     def _on_external_notification(self, event: dict):
@@ -2992,10 +2989,7 @@ class BrahmaLive:
 
         message = "What would you like to say in reply?"
         self.ui.write_log(f"Brahma Evo: {message}")
-        if self.session and self._loop:
-            self.speak(message)
-        else:
-            threading.Thread(target=speak_native, args=(message,), daemon=True).start()
+        self.speak(message)
         try:
             self.ui.begin_task_workspace(
                 "Replying to message",
