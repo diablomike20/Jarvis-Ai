@@ -90,6 +90,6 @@ def test_forge_completion_is_saved_as_assistant_reply_and_spoken():
         result = assistant._forge_skill("check for Windows updates")
 
     assert "windows_update_check" in assistant.ui.logs[0]
-    assert assistant.ui.logs[0].startswith("Brahma Evo:")
+    assert assistant.ui.logs[0].startswith("Jarvis AI:")
     assert spoken == [assistant.ui.logs[0].split(":", 1)[1].strip()]
     assert result == "Successfully forged and activated feature."

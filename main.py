@@ -119,7 +119,7 @@ def get_base_dir():
 BASE_DIR        = get_base_dir()
 API_CONFIG_PATH = get_user_data_dir() / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
-STARTUP_LOG     = Path(os.environ.get("LOCALAPPDATA", str(BASE_DIR))) / "Brahma Evo" / "startup.log"
+STARTUP_LOG     = Path(os.environ.get("LOCALAPPDATA", str(BASE_DIR))) / "Jarvis AI" / "startup.log"
 CHANNELS            = 1
 SEND_SAMPLE_RATE    = 16000
 RECEIVE_SAMPLE_RATE = 24000
@@ -161,7 +161,7 @@ def _ensure_desktop_shortcut() -> None:
             desktop_dir = Path(os.path.expanduser("~")) / "Desktop"
             
         desktop_dir.mkdir(parents=True, exist_ok=True)
-        shortcut_path = desktop_dir / "Brahma Evo.lnk"
+        shortcut_path = desktop_dir / "Jarvis AI.lnk"
         script_path = BASE_DIR / "main.py"
         icon_path = BASE_DIR / "assets" / "Brahma_Lite_Logo.ico"
 
@@ -194,7 +194,7 @@ def _ensure_desktop_shortcut() -> None:
             f"$Shortcut.Arguments = '{_ps_escape(shortcut_args)}'",
             f"$Shortcut.WorkingDirectory = '{_ps_escape(str(BASE_DIR))}'",
             "$Shortcut.WindowStyle = 1",
-            "$Shortcut.Description = 'Launch Brahma Evo'",
+            "$Shortcut.Description = 'Launch Jarvis AI'",
             f"if ('{_ps_escape(icon_value)}') {{ $Shortcut.IconLocation = '{_ps_escape(icon_value)},0' }}",
             "$Shortcut.Save()",
         ])
@@ -217,7 +217,7 @@ def _load_system_prompt() -> str:
         base_prompt = PROMPT_PATH.read_text(encoding="utf-8")
     except Exception:
         base_prompt = (
-            "You are Brahma Evo, a calm, direct, and professional AI assistant. "
+            "You are Jarvis AI, a calm, direct, and professional AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool. "
             "If the user asks to create, build, launch, or open a website, always use the selected workspace folder."
@@ -225,7 +225,7 @@ def _load_system_prompt() -> str:
         
     try:
         from core.identity import identity
-        ast_name = identity.get_assistant_name() or "Brahma Evo"
+        ast_name = identity.get_assistant_name() or "Jarvis AI"
         own_name = identity.get_owner_name() or "the user"
         role = identity.get_owner_role()
         mode = identity.get_behavior_mode()
@@ -270,7 +270,7 @@ def _speak_daily_briefing(ui=None, speak=None) -> None:
         data, narrative = compile_unified_briefing()
         if ui:
             ui.show_daily_briefing(data)
-            ui.write_log(f"Brahma Evo: {narrative}")
+            ui.write_log(f"Jarvis AI: {narrative}")
         (speak or speak_native)(narrative)
     except Exception as e:
         print(f"[DailyBriefing] Error: {e}")
@@ -859,7 +859,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "connect_list_devices",
         "description": (
-            "Lists devices connected to Brahma Connect. Use when the user asks what devices are connected, "
+            "Lists devices connected to Jarvis AI Connect. Use when the user asks what devices are connected, "
             "what is online, or wants a simple inventory of paired devices."
         ),
         "parameters": {
@@ -907,7 +907,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "connect_execute",
         "description": (
-            "Routes a Brahma Connect command to a paired device through the gateway. "
+            "Routes a Jarvis AI Connect command to a paired device through the gateway. "
             "Use for actions such as launch_app, open_url, get_battery, capture_screen, take_photo, "
             "clipboard_get, clipboard_set, send_file, receive_file, media_play, media_pause, volume_set, "
             "notification_list, get_device_info, close_app, mouse_move, keyboard_type, unlock_phone, file_list, file_read, file_write, file_delete."
@@ -941,7 +941,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "connect_pair_device",
         "description": (
-            "Creates or approves Brahma Connect pairing. Use to generate a QR code / pairing code for a new device, "
+            "Creates or approves Jarvis AI Connect pairing. Use to generate a QR code / pairing code for a new device, "
             "or to approve a pending pairing request."
         ),
         "parameters": {
@@ -957,7 +957,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "connect_disconnect_device",
         "description": (
-            "Disconnects a device from Brahma Connect and marks it offline. "
+            "Disconnects a device from Jarvis AI Connect and marks it offline. "
             "Use when the user asks to disconnect, log out, or stop a paired device."
         ),
         "parameters": {
@@ -1207,7 +1207,7 @@ TOOL_DECLARATIONS = [
         "name": "presentation_builder",
         "description": (
             "Creates editable PowerPoint presentations (.pptx) from a structured slide outline. "
-            "Brahma Evo automatically infers the best visual style from the topic, searches for a matching online template when available, "
+            "Jarvis AI automatically infers the best visual style from the topic, searches for a matching online template when available, "
             "reuses cached templates, and falls back to the built-in designer if no suitable template is found. "
             "Use when the user asks for a deck, slideshow, presentation, pitch deck, or report slides."
         ),
@@ -1218,7 +1218,7 @@ TOOL_DECLARATIONS = [
                 "subtitle": {"type": "STRING", "description": "Optional subtitle or audience line"},
                 "theme": {
                     "type": "STRING",
-                    "description": "Optional presentation theme or visual direction such as neon, corporate, luxury, academic, sunset, or creative. If omitted, Brahma Evo infers the best style automatically."
+                    "description": "Optional presentation theme or visual direction such as neon, corporate, luxury, academic, sunset, or creative. If omitted, Jarvis AI infers the best style automatically."
                 },
                 "outline": {
                     "type": "STRING",
@@ -1378,7 +1378,7 @@ TOOL_DECLARATIONS = [
         "description": (
             "Shuts down the assistant completely. "
         "Call this when the user expresses intent to end the conversation, "
-        "close the assistant, say goodbye, or stop Brahma Evo. "
+        "close the assistant, say goodbye, or stop Jarvis AI. "
         "The user can say this in ANY language."
     ),
     "parameters": {
@@ -1655,7 +1655,7 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "geospatial_globe",
-        "description": "Opens Brahma's interactive 3D map for routes, live aircraft, weather, earthquakes, nearby places, and ISS tracking.",
+        "description": "Opens Jarvis AI's interactive 3D map for routes, live aircraft, weather, earthquakes, nearby places, and ISS tracking.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -1672,7 +1672,7 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "call_screening",
-        "description": "Screens an incoming call with Brahma as an AI attendant. Answering always waits for the user to confirm on the Echo HUD.",
+        "description": "Screens an incoming call with Jarvis AI as an AI attendant. Answering always waits for the user to confirm on the Echo HUD.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -1698,7 +1698,7 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "dynamic_skill",
-        "description": "Lists and runs installed Brahma skills, including stock, crypto, cricket, speed-test, and ISS examples. Running a skill requires user confirmation.",
+        "description": "Lists and runs installed Jarvis AI skills, including stock, crypto, cricket, speed-test, and ISS examples. Running a skill requires user confirmation.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -2111,7 +2111,7 @@ class BrahmaLive:
         if skill_goal is not None:
             if not skill_goal:
                 prompt = "What should the new skill or feature do?"
-                self.ui.write_log(f"Brahma Evo: {prompt}")
+                self.ui.write_log(f"Jarvis AI: {prompt}")
                 self.speak(prompt)
                 return
 
@@ -2148,7 +2148,7 @@ class BrahmaLive:
                             out_text = str(res.get("summary") or res.get("output") or res.get("text") or res).strip()
                         else:
                             out_text = str(res).strip()
-                        self.ui.write_log(f"Brahma Evo [{skill_name}]:\n{out_text}")
+                        self.ui.write_log(f"Jarvis AI [{skill_name}]:\n{out_text}")
                         if hasattr(self.ui, "finish_task_workspace"):
                             self.ui.finish_task_workspace(out_text, f"{skill_name} completed.", 100)
                         if hasattr(self.ui, "show_hud_deliverable"):
@@ -2203,7 +2203,7 @@ class BrahmaLive:
             if not recipient:
                 self._email_step = 0
                 prompt = "Who would you like to send the email to?"
-                self.ui.write_log(f"Brahma Evo: {prompt}")
+                self.ui.write_log(f"Jarvis AI: {prompt}")
                 self.speak(prompt)
                 try:
                     self.ui.update_task_workspace(
@@ -2216,7 +2216,7 @@ class BrahmaLive:
             else:
                 self._email_step = 1
                 prompt = "Which email app would you like to use? (Gmail, default mail app, etc.)"
-                self.ui.write_log(f"Brahma Evo: {prompt}")
+                self.ui.write_log(f"Jarvis AI: {prompt}")
                 self.speak(prompt)
                 try:
                     self.ui.update_task_workspace(
@@ -2264,10 +2264,10 @@ class BrahmaLive:
             devices = self._smart_home.list_devices()
             routed_text_home = sd_mgr.route_command(text, devices)
             if routed_text_home != text:
-                print(f"[BRAHMA EVO] Redirection: '{text}' -> '{routed_text_home}'")
+                print(f"[JARVIS AI] Redirection: '{text}' -> '{routed_text_home}'")
                 text = routed_text_home
         except Exception as e:
-            print(f"[BRAHMA EVO] Redirection error: {e}")
+            print(f"[JARVIS AI] Redirection error: {e}")
 
         developer_settings = self.ui._load_app_settings() if hasattr(self.ui, "_load_app_settings") else {}
         developer_workspace = str(developer_settings.get("developer_mode_workspace", "")).strip()
@@ -2334,7 +2334,7 @@ class BrahmaLive:
         code_request = (not presentation_request and not spreadsheet_request) and _looks_like_code_request(text) and any(w in text.lower() for w in ("app", "website", "web", "program", "script", "project", "game", "calc", "html", "react"))
 
         if website_request or code_request:
-            self.speak("Working on your project with Brahma Dev...")
+            self.speak("Working on your project with Jarvis AI Dev...")
             if hasattr(self.ui, "begin_task_workspace"):
                 self.ui.begin_task_workspace(text, ["Analyzing specifications", "Scaffolding files", "Writing code", "Verifying build"], source=source or "local")
 
@@ -2373,7 +2373,7 @@ class BrahmaLive:
                     except Exception:
                         pass
                 except Exception as exc:
-                    self.ui.write_log(f"ERR: Brahma Dev failed: {exc}")
+                    self.ui.write_log(f"ERR: Jarvis AI Dev failed: {exc}")
                     if hasattr(self.ui, "update_task_workspace"):
                         self.ui.update_task_workspace(status="Build Failed", output=str(exc), percent=0)
                     self.speak("There was an issue building the project, sir. Please check the logs.")
@@ -2529,7 +2529,7 @@ class BrahmaLive:
                     from actions.auto_heal_engine import AutoHealEngine
                     tb_str = traceback.format_exc()
                     AutoHealEngine.record_last_error(tb_str)
-                    err_msg = f"Simulated bug triggered in test_action.py: {type(exc).__name__}. Traceback captured! You can now say 'Brahma, fix that bug'."
+                    err_msg = f"Simulated bug triggered in test_action.py: {type(exc).__name__}. Traceback captured! You can now say 'Jarvis AI, fix that bug'."
                     self.speak(err_msg)
                     self.ui.write_log(f"[AutoHeal Test] {err_msg}")
                     if hasattr(self.ui, "finish_task_workspace"):
@@ -2647,7 +2647,7 @@ class BrahmaLive:
             try:
                 self.ui.update_task_workspace(
                     status="Scanning screen",
-                    output="Brahma Evo is inspecting the screen for what you asked about.",
+                    output="Jarvis AI is inspecting the screen for what you asked about.",
                     percent=40,
                 )
             except Exception:
@@ -2748,7 +2748,7 @@ class BrahmaLive:
                 percent=100,
                 source=source,
             )
-            self.ui.write_log(f"Brahma Evo: {detail}")
+            self.ui.write_log(f"Jarvis AI: {detail}")
             self.speak(detail)
             if not self.ui.muted:
                 self.ui.set_state("LISTENING")
@@ -2921,13 +2921,13 @@ class BrahmaLive:
             result = json.loads(result_json)
             if result.get("success", False):
                 detail = str(result.get("detail") or result.get("error") or "Device command completed.")
-                title = f"Brahma Connect: {action}"
+                title = f"Jarvis AI Connect: {action}"
                 self.ui.update_task_workspace(
                     title=title,
                     command=text,
                     plan=[
                         "Identify the paired phone or device",
-                        "Route the command through Brahma Connect",
+                        "Route the command through Jarvis AI Connect",
                         "Verify the device response",
                         "Report the result",
                     ],
@@ -2936,13 +2936,13 @@ class BrahmaLive:
                     percent=100,
                     source=source,
                 )
-                self.ui.write_log(f"Brahma Evo: {detail}")
+                self.ui.write_log(f"Jarvis AI: {detail}")
                 self.speak(detail)
                 if not self.ui.muted:
                     self.ui.set_state("LISTENING")
                 return True
 
-            self.ui.write_log(f"ERR: Brahma Connect command failed: {result.get('error') or 'Unknown error'}")
+            self.ui.write_log(f"ERR: Jarvis AI Connect command failed: {result.get('error') or 'Unknown error'}")
             return False
         except Exception:
             return False
@@ -3008,7 +3008,7 @@ class BrahmaLive:
 
     def _announce_attention(self, event: dict):
         msg = self._attention_message(event)
-        self.ui.write_log(f"Brahma Evo: {msg}")
+        self.ui.write_log(f"Jarvis AI: {msg}")
         self.speak(msg)
         self.ui.show_attention_alert(event)
 
@@ -3078,7 +3078,7 @@ class BrahmaLive:
         if summary:
             self.ui.write_log(f"[Meeting] {summary}")
         if answer:
-            self.ui.write_log(f"Brahma Evo: {answer}")
+            self.ui.write_log(f"Jarvis AI: {answer}")
 
     def _on_meeting_state(self, state: str):
         if state == "LISTENING":
@@ -3099,7 +3099,7 @@ class BrahmaLive:
             self._reply_mode = True
 
         message = "What would you like to say in reply?"
-        self.ui.write_log(f"Brahma Evo: {message}")
+        self.ui.write_log(f"Jarvis AI: {message}")
         self.speak(message)
         try:
             self.ui.begin_task_workspace(
@@ -3252,7 +3252,7 @@ class BrahmaLive:
             if intent == "CANCEL":
                 self._ig_reply_mode = False
                 msg = "Instagram reply cancelled."
-                self.ui.write_log(f"Brahma Evo: {msg}")
+                self.ui.write_log(f"Jarvis AI: {msg}")
                 self.speak(msg)
                 self._ig_pending_thread = None
                 return True
@@ -3296,7 +3296,7 @@ class BrahmaLive:
             self._email_step = 0
             self._email_profiles = {}
             msg = "Email sending cancelled, sir."
-            self.ui.write_log(f"Brahma Evo: {msg}")
+            self.ui.write_log(f"Jarvis AI: {msg}")
             self.speak(msg)
             try:
                 self.ui.finish_task_workspace("Email sending cancelled.", "Cancelled", 100)
@@ -3309,7 +3309,7 @@ class BrahmaLive:
             self._email_recipient = text.strip()
             self._email_step = 1
             prompt = "Which email app would you like to use? (Gmail, default mail app, etc.)"
-            self.ui.write_log(f"Brahma Evo: {prompt}")
+            self.ui.write_log(f"Jarvis AI: {prompt}")
             self.speak(prompt)
             try:
                 self.ui.update_task_workspace(
@@ -3327,7 +3327,7 @@ class BrahmaLive:
             self._email_step = 2
             
             prompt = "What is the message you'd like to send?"
-            self.ui.write_log(f"Brahma Evo: {prompt}")
+            self.ui.write_log(f"Jarvis AI: {prompt}")
             self.speak(prompt)
             try:
                 self.ui.update_task_workspace(
@@ -3347,7 +3347,7 @@ class BrahmaLive:
             
             # Now let's execute composing!
             msg = f"Opening {self._email_app} and composing email to {self._email_recipient}..."
-            self.ui.write_log(f"Brahma Evo: {msg}")
+            self.ui.write_log(f"Jarvis AI: {msg}")
             self.speak(msg)
             try:
                 self.ui.update_task_workspace(
@@ -3361,7 +3361,7 @@ class BrahmaLive:
             try:
                 import urllib.parse
                 import webbrowser
-                subject = "Message from Brahma Evo"
+                subject = "Message from Jarvis AI"
                 quoted_recipient = urllib.parse.quote(self._email_recipient)
                 quoted_subject = urllib.parse.quote(subject)
                 quoted_body = urllib.parse.quote(self._email_message)
@@ -3376,7 +3376,7 @@ class BrahmaLive:
                 if "gmail" in app_lower or "chrome" in app_lower:
                     import urllib.parse
                     quoted_recipient = urllib.parse.quote(self._email_recipient)
-                    quoted_subject = urllib.parse.quote("Message from Brahma Evo")
+                    quoted_subject = urllib.parse.quote("Message from Jarvis AI")
                     quoted_body = urllib.parse.quote(self._email_message)
                     url = f"https://mail.google.com/mail/?view=cm&fs=1&to={quoted_recipient}&su={quoted_subject}&body={quoted_body}"
                     
@@ -3421,7 +3421,7 @@ class BrahmaLive:
                 return self._prompt_message_reply(event)
             if self._attention_matches(lower, ("hear", "read", "what is it", "tell me", "show it", "open it")):
                 preview = read_event_preview(event)
-                self.ui.write_log(f"Brahma Evo: {preview}")
+                self.ui.write_log(f"Jarvis AI: {preview}")
                 threading.Thread(target=speak_native, args=(preview,), daemon=True).start()
                 with self._attention_lock:
                     self._pending_attention = None
@@ -3471,7 +3471,7 @@ class BrahmaLive:
         if kind == "message":
             if decision == "hear":
                 preview = read_event_preview(event)
-                self.ui.write_log(f"Brahma Evo: {preview}")
+                self.ui.write_log(f"Jarvis AI: {preview}")
                 threading.Thread(target=speak_native, args=(preview,), daemon=True).start()
             elif decision == "reply":
                 self._prompt_message_reply(event)
@@ -3528,7 +3528,7 @@ class BrahmaLive:
             try:
                 self.ui.update_task_workspace(
                     status="Thinking",
-                    output="Brahma Evo is drafting a direct reply.",
+                    output="Jarvis AI is drafting a direct reply.",
                     percent=35,
                 )
             except Exception:
@@ -3554,13 +3554,13 @@ class BrahmaLive:
                     reply = openrouter_client.chat(
                         request_text,
                         system=(
-                            "You are Brahma Evo, a concise, helpful desktop assistant. "
+                            "You are Jarvis AI, a concise, helpful desktop assistant. "
                             "Reply naturally and briefly. Do not mention internal implementation details."
                         ),
                     )
-                    print("[BRAHMA EVO] 🌐 OpenRouter answered successfully!")
+                    print("[JARVIS AI] 🌐 OpenRouter answered successfully!")
                 except Exception as e_or:
-                    print(f"[BRAHMA EVO] ⚠️ OpenRouter failed: {e_or}")
+                    print(f"[JARVIS AI] ⚠️ OpenRouter failed: {e_or}")
 
             # 3. If user explicitly configured Local AI, is in Offline Mode, or cloud provider failed: run Local Brain
             if not reply and local_brain.is_available():
@@ -3577,7 +3577,7 @@ class BrahmaLive:
                     except Exception:
                         pass
                     if not prompt_txt:
-                        prompt_txt = "You are Brahma Evo, the autonomous desktop operating system."
+                        prompt_txt = "You are Jarvis AI, the autonomous desktop operating system."
 
                     system_prompt = (
                         f"{prompt_txt}\n\n"
@@ -3615,7 +3615,7 @@ class BrahmaLive:
                             else:
                                 fn_args = fn_args_raw or {}
 
-                            print(f"[BRAHMA EVO] 🔒 Local Brain executing tool: {fn_name}({fn_args})")
+                            print(f"[JARVIS AI] 🔒 Local Brain executing tool: {fn_name}({fn_args})")
                             self.ui.update_task_workspace(
                                 status=f"Executing {fn_name}",
                                 output=f"Running action: {fn_name} on local machine...",
@@ -3640,13 +3640,13 @@ class BrahmaLive:
                                 if followup_reply:
                                     reply = followup_reply
                             except Exception as e_fu:
-                                print(f"[BRAHMA EVO] ⚠️ Local Brain follow-up failed: {e_fu}")
+                                print(f"[JARVIS AI] ⚠️ Local Brain follow-up failed: {e_fu}")
                                 reply = str(tool_result) if tool_result else f"{fn_name.replace('_', ' ').capitalize()} completed."
                     else:
                         reply = msg.get("content", "").strip()
-                    print(f"[BRAHMA EVO] 🔒 Local Brain ({local_model_target}) answered successfully!")
+                    print(f"[JARVIS AI] 🔒 Local Brain ({local_model_target}) answered successfully!")
                 except Exception as e_loc:
-                    print(f"[BRAHMA EVO] ⚠️ Local Brain failed: {e_loc}")
+                    print(f"[JARVIS AI] ⚠️ Local Brain failed: {e_loc}")
 
             # OpenRouter errors fall back to the local Ollama model when available.
 
@@ -3654,7 +3654,7 @@ class BrahmaLive:
             if not reply and local_brain.is_available():
                 try:
                     res = local_brain.chat_complete([
-                        {"role": "system", "content": "You are Brahma Evo, the autonomous desktop operating system. You control this PC. Never claim you cannot do automations."},
+                        {"role": "system", "content": "You are Jarvis AI, the autonomous desktop operating system. You control this PC. Never claim you cannot do automations."},
                         {"role": "user", "content": request_text}
                     ], model=local_model_target, tools=TOOL_DECLARATIONS, focus_core=True)
                     msg_net = res.get("choices", [{}])[0].get("message", {})
@@ -3673,13 +3673,13 @@ class BrahmaLive:
                         reply = self._execute_tool_sync(fn_name, fn_args, call_id)
                     else:
                         reply = msg_net.get("content", "").strip()
-                    print(f"[BRAHMA EVO] 🔒 Local Brain offline safety net answered ({local_model_target})!")
+                    print(f"[JARVIS AI] 🔒 Local Brain offline safety net answered ({local_model_target})!")
                 except Exception as e_net:
-                    print(f"[BRAHMA EVO] ⚠️ Offline Local Brain fallback failed: {e_net}")
+                    print(f"[JARVIS AI] ⚠️ Offline Local Brain fallback failed: {e_net}")
             reply = (reply or "").strip()
             if not reply:
                 reply = "Nem sikerült választ kapnom. Ellenőrizd az OpenRouter-kulcsot vagy indítsd el az Ollamát."
-            self.ui.write_log(f"Brahma Evo: {reply}")
+            self.ui.write_log(f"Jarvis AI: {reply}")
             if not getattr(self.ui, "muted", False):
                 self.speak(reply, proactive=True)
             try:
@@ -3690,7 +3690,7 @@ class BrahmaLive:
                 self.ui.set_state("LISTENING")
         except Exception as e:
             msg = f"Fallback reply failed: {e}"
-            print(f"[BRAHMA EVO] ⚠️ {msg}")
+            print(f"[JARVIS AI] ⚠️ {msg}")
             self.ui.write_log(f"ERR: {msg}")
             try:
                 self.ui.finish_task_workspace(msg, "Reply failed.", 100)
@@ -3802,7 +3802,7 @@ class BrahmaLive:
             except Exception:
                 pass
             try:
-                self.ui.write_log(f"Brahma Evo: {announcement}")
+                self.ui.write_log(f"Jarvis AI: {announcement}")
                 if execution_output:
                     self.ui.write_log(f"Result:\n{execution_output}")
             except Exception:
@@ -3832,11 +3832,11 @@ class BrahmaLive:
         name = fc.name
         args = dict(fc.args or {})
 
-        print(f"[BRAHMA EVO] 🔧 {name}  {args}")
+        print(f"[JARVIS AI] 🔧 {name}  {args}")
         self.speak(f"Working on {name.replace('_', ' ')}...")
         self.ui.set_state("THINKING")
 
-        # Trigger Brahma Right Wing: Live Operations & Sources Telemetry
+        # Trigger Jarvis AI Right Wing: Live Operations & Sources Telemetry
         tool_title = name.replace("_", " ").title()
         brief_query = (
             args.get("query")
@@ -4112,7 +4112,7 @@ class BrahmaLive:
                     if recipient:
                         if action == "take_over":
                             add_auto_thread(thread_id or recipient)
-                            result = f"Successfully took over the chat with @{recipient}. Brahma Evo will now automatically reply."
+                            result = f"Successfully took over the chat with @{recipient}. Jarvis AI will now automatically reply."
                         else:
                             res = InstagramService.instance().send_dm(recipient, reply_text, open_in_browser=True)
                             result = f"Sent reply to @{recipient}: '{reply_text}'. Thread opened in browser."
@@ -4290,7 +4290,7 @@ class BrahmaLive:
                 location = args.get("location") or "current"
                 if action == "open":
                     globe.open_globe(location if args.get("location") else None)
-                    result = "Opened the interactive Brahma map."
+                    result = "Opened the interactive Jarvis AI map."
                 elif action == "route":
                     r = await loop.run_in_executor(None, lambda: globe.show_route(args.get("origin", ""), args.get("destination", "")))
                     result = f"Flight route: {r.get('origin')} to {r.get('destination')}, {r.get('distance_km')} km, about {r.get('flight_time')}."
@@ -4335,8 +4335,8 @@ class BrahmaLive:
                     from core.confirm import request
                     result = request(
                         "start-call-screening",
-                        "Answer this call as Brahma Evo",
-                        f"Brahma will answer {event['title']} in {event['app']}, listen to the caller, and prepare a transcript and summary.",
+                        "Answer this call as Jarvis AI",
+                        f"Jarvis AI will answer {event['title']} in {event['app']}, listen to the caller, and prepare a transcript and summary.",
                         lambda: (start_call_proxy(event, ui=self.ui, speak_fn=self.speak) and "Call screening started.")
                     )
                     self.ui.set_state("LISTENING")
@@ -4352,7 +4352,7 @@ class BrahmaLive:
                 elif action == "forge":
                     goal = (args.get("goal") or "").strip()
                     if not goal:
-                        result = "Describe the capability you want Brahma to learn."
+                        result = "Describe the capability you want Jarvis AI to learn."
                     else:
                         threading.Thread(
                             target=self._forge_skill,
@@ -4384,7 +4384,7 @@ class BrahmaLive:
                             out_text = str(run_res.get("summary") or run_res.get("output") or run_res.get("text") or run_res).strip()
                         else:
                             out_text = str(run_res).strip()
-                        self.ui.write_log(f"Brahma Evo [{skill_name}]:\n{out_text}")
+                        self.ui.write_log(f"Jarvis AI [{skill_name}]:\n{out_text}")
                         result = out_text
                 else:
                     result = "Choose list or run."
@@ -4399,7 +4399,7 @@ class BrahmaLive:
                         out_text = str(run_res.get("summary") or run_res.get("output") or run_res.get("text") or run_res).strip()
                     else:
                         out_text = str(run_res).strip()
-                    self.ui.write_log(f"Brahma Evo [{name}]:\n{out_text}")
+                    self.ui.write_log(f"Jarvis AI [{name}]:\n{out_text}")
                     result = out_text
                 else:
                     result = f"Unknown tool: {name}"
@@ -4509,7 +4509,7 @@ class BrahmaLive:
         except Exception:
             pass
 
-        # Trigger Brahma Left Wing: Final Deliverables & Results
+        # Trigger Jarvis AI Left Wing: Final Deliverables & Results
         try:
             import re
             file_match = re.search(r'([A-Za-z]:\\[^\s"\'<>`\r\n]+\.(?:pdf|docx|xlsx|pptx|png|jpg|mp4|py|html|json|txt))', str(result))
@@ -4541,7 +4541,7 @@ class BrahmaLive:
         tool_voice = self._connect_tool_voice(name, result)
         if tool_voice:
             try:
-                self.ui.write_log(f"Brahma Evo: {tool_voice}")
+                self.ui.write_log(f"Jarvis AI: {tool_voice}")
             except Exception:
                 pass
             try:
@@ -4552,7 +4552,7 @@ class BrahmaLive:
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
 
-        print(f"[BRAHMA EVO] 📤 {name} → {str(result)[:80]}")
+        print(f"[JARVIS AI] 📤 {name} → {str(result)[:80]}")
 
         return SimpleNamespace(
             id=fc.id, name=name,
@@ -4714,7 +4714,7 @@ def main():
     if DashboardServer is not None and not dashboard_enabled:
         _startup_log("dashboard disabled: port 8000 already in use")
         try:
-            ui.write_log("SYS: Mobile Connect is already running in another Brahma Evo instance.")
+            ui.write_log("SYS: Mobile Connect is already running in another Jarvis AI instance.")
         except Exception:
             pass
     if dashboard_enabled:
@@ -4744,7 +4744,7 @@ def main():
         except Exception as exc:
             _startup_log(f"brahma connect init failed: {exc}")
             try:
-                ui.write_log(f"ERR: Brahma Connect failed to initialize: {exc}")
+                ui.write_log(f"ERR: Jarvis AI Connect failed to initialize: {exc}")
             except Exception:
                 pass
             brahma_connect = None
@@ -4758,7 +4758,7 @@ def main():
         if _is_port_in_use(connect_port):
             _startup_log(f"brahma connect disabled: port {connect_port} already in use")
             try:
-                ui.write_log(f"SYS: Brahma Connect is already running on port {connect_port}.")
+                ui.write_log(f"SYS: Jarvis AI Connect is already running on port {connect_port}.")
             except Exception:
                 pass
         else:
@@ -4770,7 +4770,7 @@ def main():
                 except Exception as exc:
                     _startup_log(f"brahma connect thread error: {exc}")
                     try:
-                        ui.write_log(f"ERR: Brahma Connect server failed: {exc}")
+                        ui.write_log(f"ERR: Jarvis AI Connect server failed: {exc}")
                     except Exception:
                         pass
 
@@ -4781,7 +4781,7 @@ def main():
     ui.show_main()
     _startup_log("ui shown")
 
-    # Start Brahma Passive Sensorium Engine (v2)
+    # Start Jarvis AI Passive Sensorium Engine (v2)
     try:
         def _on_sensorium_alert(alert_type: str, meta: dict):
             msg = meta.get("message", "System state change detected.")
@@ -4868,7 +4868,7 @@ def main():
                     snippet = f": '{clean_text[:75]}...'" if len(clean_text) > 75 else (f": '{clean_text}'" if clean_text else "")
                     msg = f"You received a new Instagram message from {username}{snippet}. What should I reply, or should I take over the chat?"
                     ui.write_log(f"📱 Insta (@{username}): {clean_text or '[Media/Attachment]'}")
-                    ui.write_log(f"Brahma Evo: {msg}")
+                    ui.write_log(f"Jarvis AI: {msg}")
                     brahma_evo.speak(msg)
                     return None
                 
@@ -4889,14 +4889,14 @@ def main():
                     subj_preview = f"'{clean_subj[:70]}...'" if len(clean_subj) > 70 else f"'{clean_subj}'"
                     msg = f"You received a new email from {sender} with subject: {subj_preview}."
                     ui.write_log(f"📧 Email ({sender}): {clean_subj}")
-                    ui.write_log(f"Brahma Evo: {msg}")
+                    ui.write_log(f"Jarvis AI: {msg}")
                     brahma_evo.speak(msg)
 
                 set_email_prompt_callback(_email_handler)
                 start_email_daemon(poll_interval=25)
-                print("[Brahma Evo] Background email watcher started.")
+                print("[Jarvis AI] Background email watcher started.")
         except Exception as e:
-            print(f"[Brahma Evo] Email daemon initialization notice: {e}")
+            print(f"[Jarvis AI] Email daemon initialization notice: {e}")
 
         def _clipboard_monitor():
             try:
@@ -4913,7 +4913,7 @@ def main():
                         text = (curr_clip or "").strip()
                         if text and len(text) > 3:
                             reply = _clipboard_cloud_reply(text[:1000])
-                            ui.write_log(f"Brahma Evo (Clipboard): {reply}")
+                            ui.write_log(f"Jarvis AI (Clipboard): {reply}")
                             brahma_evo.speak(reply)
                 except Exception:
                     pass

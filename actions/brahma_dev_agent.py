@@ -22,7 +22,7 @@ API_CONFIG_PATH = get_user_data_dir() / "config" / "api_keys.json"
 SETTINGS_PATH = get_user_data_dir() / "config" / "app_settings.json"
 
 # ==============================================================================
-# NATIVE CLAUDE-CODE TOOLS (REBRANDED FOR BRAHMA DEV)
+# NATIVE CLAUDE-CODE TOOLS (REBRANDED FOR JARVIS AI DEV)
 # ==============================================================================
 
 class NativeTools:
@@ -209,10 +209,10 @@ class NativeTools:
 
 
 # ==============================================================================
-# CLAUDE-CODE LEAKED SYSTEM PROMPT (REBRANDED FOR BRAHMA DEV)
+# CLAUDE-CODE LEAKED SYSTEM PROMPT (REBRANDED FOR JARVIS AI DEV)
 # ==============================================================================
 
-BRAHMA_DEV_SYSTEM_PROMPT = """You are Brahma Dev, the expert software engineering autonomous agent built natively into Brahma AI.
+BRAHMA_DEV_SYSTEM_PROMPT = """You are Jarvis AI Dev, the expert software engineering autonomous agent built natively into Jarvis AI.
 You operate on the local user machine inside the user's project workspace.
 You have native access to developer tools to inspect codebases, execute terminal commands, edit existing files, write new code, and verify project functionality.
 
@@ -402,7 +402,7 @@ class BrahmaDevAgent:
             except Exception as e:
                 err_msg = f"LLM error: {e}"
                 logger.error(err_msg)
-                return f"Brahma Dev encountered an error during inference: {err_msg}"
+                return f"Jarvis AI Dev encountered an error during inference: {err_msg}"
 
             self.history.append({"role": "assistant", "content": reply})
 

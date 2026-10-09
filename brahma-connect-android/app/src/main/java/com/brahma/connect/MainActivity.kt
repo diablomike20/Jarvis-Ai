@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
             }
         } else {
             pendingServiceStart = false
-            AgentStateStore.setError("Notification permission is required for Brahma Connect.")
+            AgentStateStore.setError("Notification permission is required for Jarvis AI Connect.")
             AgentStateStore.setStatus("Notification permission denied")
         }
     }
@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
             AgentStateStore.setPairingOffer(it)
             AgentStateStore.setGateway(
                 com.brahma.connect.core.GatewayEndpoint(
-                    name = "Brahma PC",
+                    name = "Jarvis AI PC",
                     host = it.host,
                     port = it.port,
                 )

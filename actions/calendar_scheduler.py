@@ -1,7 +1,7 @@
 from core.user_paths import get_user_data_dir
 # actions/calendar_scheduler.py
 """
-Calendar and Schedule Management for Brahma AI.
+Calendar and Schedule Management for Jarvis AI.
 
 Allows creating, listing, checking, and managing calendar appointments,
 meetings, and events with local persistent storage and .ics calendar exports.
@@ -220,7 +220,7 @@ def calendar_scheduler(
         ics_lines = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//Brahma AI//Calendar Scheduler//EN",
+            "PRODID:-//Jarvis AI//Calendar Scheduler//EN",
         ]
         for ev in events:
             try:
@@ -249,5 +249,5 @@ def calendar_scheduler(
 
 
 def run(parameters: dict, player=None, session_memory=None) -> str:
-    """Plugin wrapper for Brahma architecture."""
+    """Plugin wrapper for Jarvis AI architecture."""
     return calendar_scheduler(parameters, player=player, session_memory=session_memory)

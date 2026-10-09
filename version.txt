@@ -15,12 +15,12 @@ VSVersionInfo(
       StringTable(
         '040904B0',
         [StringStruct('CompanyName', 'User'),
-        StringStruct('FileDescription', 'Brahma Evo AI Assistant'),
+        StringStruct('FileDescription', 'Jarvis AI AI Assistant'),
         StringStruct('FileVersion', '1.0.0'),
         StringStruct('InternalName', 'BrahmaEvo'),
         StringStruct('LegalCopyright', '© User. All rights reserved.'),
         StringStruct('OriginalFilename', 'BrahmaEvo.exe'),
-        StringStruct('ProductName', 'Brahma Evo'),
+        StringStruct('ProductName', 'Jarvis AI'),
         StringStruct('ProductVersion', '1.0.0')])
       ]), 
     VarFileInfo([VarStruct('Translation', [1033, 1200])])

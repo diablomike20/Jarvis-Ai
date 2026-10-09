@@ -1,5 +1,5 @@
 """
-office_builder.py - Brahma AI office document generation
+office_builder.py - Jarvis AI office document generation
 
 Creates PowerPoint presentations and Excel workbooks from structured inputs.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 from actions.ppt_template_workflow import infer_presentation_profile
 
 
-PROJECT_NAME = "Brahma AI - Lite"
+PROJECT_NAME = "Jarvis AI - Lite"
 DEFAULT_OUTPUT_DIR = Path.home() / "Desktop" / "BrahmaAI"
 
 

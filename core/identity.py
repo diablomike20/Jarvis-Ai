@@ -22,8 +22,8 @@ class IdentityService:
                 "about": ""
             },
             "assistant": {
-                "name": "Brahma",
-                "application_name": "Brahma Evo",
+                "name": "Jarvis AI",
+                "application_name": "Jarvis AI",
                 "title": "Personal AI Assistant"
             },
             "behavior": {
@@ -43,12 +43,17 @@ class IdentityService:
                 with open(self.config_file, "r", encoding="utf-8") as f:
                     loaded_data = json.load(f)
                     
-                    # Deep merge to preserve defaults for missing keys
+                    # Keep existing custom user identity, migrate only old default names.
                     for section, values in loaded_data.items():
                         if section in self.data and isinstance(values, dict):
                             self.data[section].update(values)
                         else:
                             self.data[section] = values
+                    assistant = self.data.get("assistant", {})
+                    if isinstance(assistant, dict):
+                        for key in ("name", "application_name"):
+                            if assistant.get(key) in ("Brahma", "Brahma Evo", "Brahma AI Evo"):
+                                assistant[key] = "Jarvis AI"
             except Exception as e:
                 print(f"Error loading identity config: {e}")
         else:
@@ -64,16 +69,16 @@ class IdentityService:
 
     # Assistant methods
     def get_assistant_name(self) -> str:
-        val = self.data["assistant"].get("name", "Brahma")
-        return val if val is not None else "Brahma"
+        val = self.data["assistant"].get("name", "Jarvis AI")
+        return val if val is not None else "Jarvis AI"
         
     def set_assistant_name(self, name: str):
         self.data["assistant"]["name"] = name
         self.save()
 
     def get_application_name(self) -> str:
-        val = self.data["assistant"].get("application_name", "Brahma Evo")
-        return val if val is not None else "Brahma Evo"
+        val = self.data["assistant"].get("application_name", "Jarvis AI")
+        return val if val is not None else "Jarvis AI"
         
     def set_application_name(self, name: str):
         self.data["assistant"]["application_name"] = name

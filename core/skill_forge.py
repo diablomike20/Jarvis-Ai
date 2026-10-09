@@ -1,9 +1,9 @@
 """
 The Skill Forge: Autonomous Capability Synthesis Engine
-Part of Project Ultron for Brahma AI.
+Part of Project Ultron for Jarvis AI.
 
 Transforms natural language goals into fully architected, tested,
-and hot-pluggable Python skills for Brahma AI.
+and hot-pluggable Python skills for Jarvis AI.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ API_CONFIG_PATH = CONFIG_DIR / "api_keys.json"
 
 
 class SkillForge:
-    """Autonomous synthesizer of new Brahma AI skills."""
+    """Autonomous synthesizer of new Jarvis AI skills."""
 
     @classmethod
     def forge_skill(
@@ -255,7 +255,7 @@ class SkillForge:
     @classmethod
     def _call_llm_synthesizer(cls, goal: str, name_hint: str, context_hints: str) -> Dict[str, Any]:
         """Prompts the configured LLM to generate the complete skill package JSON."""
-        system_instructions = """You are the Brahma AI Autonomous Skill Architect ("Project Ultron").
+        system_instructions = """You are the Jarvis AI Autonomous Skill Architect ("Project Ultron").
 Your mission is to invent, architect, and write a complete, standalone, production-ready Python skill plugin.
 
 Skill Architecture Guidelines:
@@ -280,7 +280,7 @@ Skill Architecture Guidelines:
      c) For web images/GIFs: Attempt downloading using safe SSL context or requests, but if download fails or if network is unavailable, IMMEDIATELY fall back to drawing a crisp high-tech visual deliverable using PIL/matplotlib so execution always succeeds and displays on screen.
      d) Return format for visuals:
         `return {'image_path': image_path, 'title': '...', 'summary': '...'}`
-        This triggers Brahma Evo's HUD Result Wing to immediately display the card!
+        This triggers Jarvis AI's HUD Result Wing to immediately display the card!
 6. Output Format:
    Output MUST be clean JSON with exact structure:
 {
@@ -340,7 +340,7 @@ Additional Context: {context_hints}
     @classmethod
     def _repair_code(cls, broken_code: str, error_msg: str, goal: str) -> Dict[str, Any]:
         """Asks LLM to fix syntax or sandbox runtime errors."""
-        prompt = f"""You are repairing a Python skill generated for Brahma AI ("Project Ultron").
+        prompt = f"""You are repairing a Python skill generated for Jarvis AI ("Project Ultron").
 The skill failed verification in the Crucible sandbox.
 User Goal: {goal}
 Verification Error: {error_msg}

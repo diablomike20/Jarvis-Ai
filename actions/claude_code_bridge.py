@@ -49,7 +49,7 @@ def run_developer_mode_request(parameters: dict[str, Any], speak=None) -> str:
     params["workspace_path"] = workspace
     params["output_dir"] = workspace
 
-    # Run native Brahma Dev Agent powered by Claude Code architecture & tools
+    # Run native Jarvis AI Dev Agent powered by Claude Code architecture & tools
     try:
         return run_dev_agent(params, speak=speak)
     except Exception as exc:
