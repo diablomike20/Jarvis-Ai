@@ -1796,15 +1796,11 @@ class BrahmaLive:
     def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
         self.ui             = ui
         self._smart_home    = SmartHomeService()
-        self.session        = None
-        self.audio_in_queue = None
-        self.out_queue      = None
-        self._startup_briefing_started = False
+                self._startup_briefing_started = False
         self._loop          = None
         self._is_speaking   = False
         self._speaking_lock = threading.Lock()
-        self._use_openrouter_first = False
-        self._pending_attention: dict | None = None
+                self._pending_attention: dict | None = None
         self._pending_reply_event: dict | None = None
         self._reply_mode = False
         self._attention_lock = threading.Lock()
@@ -1826,7 +1822,6 @@ class BrahmaLive:
             on_update=self._on_meeting_update,
             on_state=self._on_meeting_state,
         )
-        self._phone_active = False
         self._dashboard = dashboard if dashboard is not None else (DashboardServer() if (enable_dashboard and DashboardServer is not None) else None)
         self._dashboard_started = bool(dashboard_started and self._dashboard is not None)
         self.ui.on_text_command = self._on_text_command
@@ -1919,15 +1914,12 @@ class BrahmaLive:
                     engine.mark_triggered()
                     prompt = engine.build_prompt(memory={})
                     
-                    if self.session and self._loop:
-                        import asyncio
-                        async def _send():
-                            try:
-                                await self.session.send(input=prompt, end_of_turn=True)
-                            except Exception as e:
-                                print(f"[Proactive] Error: {e}")
-                        asyncio.run_coroutine_threadsafe(_send(), self._loop)
-                        self._reset_idle_activity()
+                    # Generate a proactive message using the configured AI backend.
+                    threading.Thread(
+                        target=self._fallback_reply, args=(prompt,),
+                        daemon=True, name="jarvis-proactive-reply",
+                    ).start()
+                    self._reset_idle_activity()
                     
             except Exception as e:
                 print(f"[Proactive] Error: {e}")
@@ -2583,29 +2575,13 @@ class BrahmaLive:
 
             threading.Thread(target=_run_screen_process, daemon=True).start()
             return
-        # Route directly to Local Brain if preferred by user in settings or in air-gapped offline mode
-        app_settings = config_manager.load_settings()
-        configured_provider = app_settings.get("default_ai_provider", "OpenRouter")
-        is_offline_mode = bool(app_settings.get("offline_mode_enabled", False))
-
-        # If offline mode or Local provider selected, route directly to Local Brain
-        if is_offline_mode or configured_provider == "Local":
-            is_local_preferred = True
-        else:
-            is_local_preferred = False
-
-        if is_local_preferred or self._use_openrouter_first or not self._loop or not self.session:
-            threading.Thread(target=self._fallback_reply, args=(text, memory_ctx), daemon=True).start()
-            return
-        self.ui.set_state("THINKING")
-        asyncio.run_coroutine_threadsafe(
-            self.session.send_client_content(
-                turns={"parts": [{"text": routed_text}]},
-                turn_complete=True
-            ),
-            self._loop
-        )
-
+        # Every non-deterministic text request now uses OpenRouter or local Ollama.
+        # There is no longer a Live API session or Gemini client-content path.
+        threading.Thread(
+            target=self._fallback_reply, args=(text, memory_ctx),
+            daemon=True, name="jarvis-ai-reply",
+        ).start()
+        return
 
     def _handle_smart_home_command(self, text: str, source: str = "local") -> bool:
         normalized = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s%]", " ", text.lower())).strip()
@@ -3640,16 +3616,6 @@ class BrahmaLive:
             pass
 
         try:
-            if self.audio_in_queue:
-                while not self.audio_in_queue.empty():
-                    try:
-                        self.audio_in_queue.get_nowait()
-                    except Exception:
-                        break
-        except Exception:
-            pass
-
-        try:
             from sound_manager import SoundManager
             SoundManager.instance().play_listening_start()
         except Exception:
@@ -3663,18 +3629,17 @@ class BrahmaLive:
         if not text:
             return
 
-        if text:
-            # Native speech engine, independent of any cloud AI provider.
-            def _speak_thread():
-                try:
-                    self.set_speaking(True)
-                    from actions.attention_monitor import _speak_edge_native
-                    _speak_edge_native(text)
-                except Exception as exc:
-                    print(f"[Brahma Speak] Unified TTS failed: {exc}")
-                finally:
-                    self.set_speaking(False)
-            threading.Thread(target=_speak_thread, daemon=True).start()
+        def _speak_thread():
+            try:
+                self.set_speaking(True)
+                from actions.attention_monitor import _speak_edge_native
+                _speak_edge_native(text)
+            except Exception as exc:
+                print(f"[Jarvis Speak] TTS failed: {exc}")
+            finally:
+                self.set_speaking(False)
+
+        threading.Thread(target=_speak_thread, daemon=True).start()
 
     def speak_error(self, tool_name: str, error: str):
         short = str(error)[:120]
@@ -4483,26 +4448,6 @@ class BrahmaLive:
                 except Exception:
                     self._on_text_command(text, source="mobile")
 
-    async def _relay_phone_audio(self):
-        if self._dashboard is None:
-            return
-        while True:
-            frame = await self._dashboard._phone_audio_queue.get()
-            if not self.out_queue:
-                continue
-            self._phone_active = True
-            try:
-                await self.out_queue.put(frame)
-            finally:
-                await asyncio.sleep(0.08)
-                if self._dashboard._phone_audio_queue.empty():
-                    self._phone_active = False
-
-    async def _send_realtime(self):
-        while True:
-            msg = await self.out_queue.get()
-            await self.session.send_realtime_input(media=msg)
-
     async def _listen_audio(self):
         """Capture mic commands for offline Hungarian Whisper, independent of Gemini."""
         from actions.local_stt import SpeechSegmenter, transcribe_pcm
@@ -4547,7 +4492,7 @@ class BrahmaLive:
                 try:
                     with self._speaking_lock:
                         speaking = self._is_speaking
-                    active = not self.ui.muted and not speaking and not self._phone_active
+                    active = not self.ui.muted and not speaking
                     samples = indata.astype(np.float32)
                     energy = float(np.sqrt(np.mean(samples * samples)))
                     if active:
@@ -4585,119 +4530,6 @@ class BrahmaLive:
             print(f"[Jarvis STT] Microphone unavailable: {exc}")
             self.ui.write_log(f"SYS: A mikrofon nem indult: {exc}. Szöveges vezérlés elérhető.")
 
-    async def _receive_audio(self):
-        print("[BRAHMA EVO] 👂 Recv started")
-        out_buf, in_buf = [], []
-
-        try:
-            while True:
-                async for response in self.session.receive():
-                    _sru = getattr(response, "session_resumption_update", None)
-                    if _sru is not None:
-                        if getattr(_sru, "resumable", False) and getattr(_sru, "new_handle", None):
-                            self._resume_handle = _sru.new_handle
-
-                    if response.data:
-                        self.set_speaking(True)
-                        self.audio_in_queue.put_nowait(response.data)
-
-                    if response.server_content:
-                        sc = response.server_content
-
-                        if sc.output_transcription and sc.output_transcription.text:
-                            self.set_speaking(True)
-                            txt = sc.output_transcription.text.strip()
-                            if txt:
-                                out_buf.append(txt)
-
-                        if sc.input_transcription and sc.input_transcription.text:
-                            txt = sc.input_transcription.text.strip()
-                            if txt:
-                                try:
-                                    from actions.attention_monitor import stop_native_speech
-                                    stop_native_speech()
-                                except Exception:
-                                    pass
-                                in_buf.append(txt)
-                                if self.ui.muted and _wakeword_detected(txt):
-                                    try:
-                                        self.ui.set_muted_state(False, wakeword=True)
-                                        self.ui.write_log("SYS: Wake word detected. Mic active.")
-                                    except Exception:
-                                        pass
-
-                        if sc.turn_complete:
-                            self.set_speaking(False)
-
-                            full_in = " ".join(in_buf).strip()
-                            if full_in:
-                                self.ui.write_log(f"You: {full_in}")
-                            in_buf = []
-
-                            full_out = " ".join(out_buf).strip()
-                            if full_out:
-                                self.ui.write_log(f"Brahma Evo: {full_out}")
-                            out_buf = []
-
-                            if full_in and len(full_in) > 5:
-                                threading.Thread(
-                                    target=_update_memory_async,
-                                    args=(full_in, full_out),
-                                    daemon=True
-                                ).start()
-
-                    if response.tool_call:
-                        self.ui.set_state("EXECUTING")
-                        fn_responses = []
-                        for fc in response.tool_call.function_calls:
-                            print(f"[BRAHMA EVO] 📞 {fc.name}")
-                            fr = await self._execute_tool(fc)
-                            fn_responses.append(fr)
-                        self.ui.set_state("THINKING")
-                        await self.session.send_tool_response(
-                            function_responses=fn_responses
-                        )
-
-        except Exception as e:
-            print(f"[BRAHMA EVO] ❌ Recv: {e}")
-            traceback.print_exc()
-            raise
-
-    async def _play_audio(self):
-        print("[BRAHMA EVO] 🔊 Play started")
-        loop = asyncio.get_event_loop()
-        import numpy as np
-
-        _spk_name = config_manager.get_output_device()
-        _spk_dev = audio_devices.resolve(_spk_name, "output") if _spk_name else None
-
-        stream = sd.RawOutputStream(
-            samplerate=RECEIVE_SAMPLE_RATE,
-            channels=CHANNELS,
-            dtype="int16",
-            blocksize=CHUNK_SIZE,
-            device=_spk_dev,
-        )
-        stream.start()
-        try:
-            while True:
-                chunk = await self.audio_in_queue.get()
-                try:
-                    pcm = np.frombuffer(chunk, dtype=np.int16)
-                    lvl = float(np.sqrt(np.mean(np.square(pcm, dtype=np.float32))))
-                    self._echo.note_output(pcm, RECEIVE_SAMPLE_RATE, lvl)
-                    self.ui.set_audio_level(min(1.0, lvl / 2500.0))
-                except Exception:
-                    pass
-                await asyncio.to_thread(stream.write, chunk)
-        except Exception as e:
-            print(f"[BRAHMA EVO] ❌ Play: {e}")
-            raise
-        finally:
-            self.set_speaking(False)
-            stream.stop()
-            stream.close()
-
     async def run(self):
         """Start local services without any OpenRouter Live connection."""
         self._attention_monitor.start()
@@ -4714,7 +4546,6 @@ class BrahmaLive:
         except Exception as exc:
             print(f"[Jarvis STT] Startup skipped: {exc}")
         self._loop = None
-        self.session = None
         if self._dashboard is not None:
             if not self._dashboard_started:
                 self._dashboard_started = True
