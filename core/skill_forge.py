@@ -230,7 +230,7 @@ class SkillForge:
 
     @classmethod
     def _call_llm_synthesizer(cls, goal: str, name_hint: str, context_hints: str) -> Dict[str, Any]:
-        """Prompts Gemini to generate the complete skill package JSON."""
+        """Prompts the configured LLM to generate the complete skill package JSON."""
         system_instructions = """You are the Brahma AI Autonomous Skill Architect ("Project Ultron").
 Your mission is to invent, architect, and write a complete, standalone, production-ready Python skill plugin.
 
@@ -263,7 +263,7 @@ Skill Architecture Guidelines:
     "manifest": {
         "name": "snake_case_feature_name",
         "aliases": ["alias_1", "alias_2"],
-        "description": "Concise, actionable description of when and how Gemini Live should call this feature",
+        "description": "Concise, actionable description of when and how the configured LLM should call this feature",
         "triggers": [
             "direct trigger phrase 1",
             "natural variation 2",
