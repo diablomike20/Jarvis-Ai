@@ -33,47 +33,17 @@ def _load_api_key() -> str:
         logger.warning(f"[OpenRouter] Failed to load API key: {e}")
         return ""
 
-TEXT_MODELS: list[str] = [
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "nousresearch/hermes-3-llama-3.1-405b:free",
-    "minimax/minimax-m2.5:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
-    "qwen/qwen3-coder:free",
-    "google/gemma-4-31b-it:free",
-    "google/gemma-4-26b-a4b-it:free",
-    "google/gemma-3-27b-it:free",
-    "arcee-ai/trinity-large-preview:free",
-    "z-ai/glm-4.5-air:free",
-    "nvidia/nemotron-3-nano-30b-a3b:free",
-    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-    "google/gemma-3-12b-it:free",
-    "nvidia/nemotron-nano-12b-v2-vl:free",
-    "nvidia/nemotron-nano-9b-v2:free",
-    "google/gemma-3-4b-it:free",
-    "google/gemma-3n-e4b-it:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "google/gemma-3n-e2b-it:free",
-    "liquid/lfm-2.5-1.2b-instruct:free",
-    "liquid/lfm-2.5-1.2b-thinking:free",
-]
-
-VISION_MODELS: list[str] = [
-    "nvidia/nemotron-nano-12b-v2-vl:free",
-    "nvidia/llama-nemotron-embed-vl-1b-v2:free",
-    "google/gemma-4-31b-it:free",
-    "google/gemma-4-26b-a4b-it:free",
-    "google/gemma-3n-e4b-it:free",
-    "google/gemma-3n-e2b-it:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
-]
+# Use OpenRouter's zero-price router instead of hardcoded or paid models.
+# The actual free model may vary by availability and requested modality.
+FREE_ROUTER_MODEL = "openrouter/free"
+TEXT_MODELS: list[str] = [FREE_ROUTER_MODEL]
+VISION_MODELS: list[str] = [FREE_ROUTER_MODEL]
 
 API_URL               = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MAX_TOKENS    = 4096
 DEFAULT_TEMPERATURE   = 0.7
-REQUEST_TIMEOUT       = 60   # seconds per request
-MAX_RETRIES_PER_MODEL = 2    # attempts before moving to next model
+REQUEST_TIMEOUT       = 35   # seconds per request
+MAX_RETRIES_PER_MODEL = 1    # attempts before moving to next model
 RETRY_DELAY           = 2    # seconds between retries
 RATE_LIMIT_COOLDOWN   = 60   # seconds before retrying a rate-limited model
 
@@ -86,8 +56,8 @@ class OpenRouterClient:
         self._headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type":  "application/json",
-            "HTTP-Referer":  "https://github.com/brahma-ai",
-            "X-Title":       "Brahma Evo",
+            "HTTP-Referer":  "https://github.com/diablomike20/Jarvis-Ai",
+            "X-Title":       "Jarvis AI",
         }
 
     def _is_rate_limited(self, model: str) -> bool:
@@ -114,6 +84,9 @@ class OpenRouterClient:
         temperature: float = DEFAULT_TEMPERATURE,
         response_format: Optional[dict] = None,
     ) -> Optional[str]:
+        # The user can configure an API key after startup; refresh it per request.
+        self.api_key = _load_api_key()
+        self._headers["Authorization"] = f"Bearer {self.api_key}"
         payload: dict = {
             "model":       model,
             "messages":    messages,
@@ -202,7 +175,7 @@ class OpenRouterClient:
                 raise
 
         for m in pool:
-            if self._is_rate_limited(m):
+            if model == m or self._is_rate_limited(m):
                 continue
             logger.info(f"[OpenRouter] Trying: {m}")
             result = self._call(m, messages, max_tokens, temperature, response_format)
