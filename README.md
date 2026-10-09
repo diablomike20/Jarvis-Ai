@@ -123,6 +123,17 @@ python -m pip install -r requirements-voice.txt
 
 [Teljes magyar Gemini-csere útmutató](docs/GEMINI_MIGRATION_HU.md).
 
+## Tetszőleges source projekt moduláris beépítése
+
+A **JARVIS Source Plugin Framework** bármely ellenőrzött GitHub-source
+képességeit fogadhatja egy kis adapterrel. Az első három integráció:
+PhotoCraft, LightCraft és FilmCraft. Az MCP stdio-t támogató, telepített
+projektek a `integrations/sources/<id>/manifest.json` fájl segítségével
+regisztrálhatók külön JARVIS-főprogrammódosítás nélkül.
+
+[Új GitHub-source beépítése – magyar útmutató](docs/SOURCE_PLUGINS_HU.md) ·
+[Creative Studio](docs/CREATIVE_STUDIO_HU.md)
+
 ## 🚀 Quick Start
 
 ### Prerequisites
