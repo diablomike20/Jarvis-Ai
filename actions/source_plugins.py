@@ -6,6 +6,7 @@ modifying Jarvis again; other kinds of source need a purpose-built adapter.
 """
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import re
@@ -129,6 +130,9 @@ def close_all():
         for _, session in _sessions.values():
             session.close()
         _sessions.clear()
+
+
+atexit.register(close_all)
 
 
 def _safe_response(plugin_id: str, tool: str, result: object) -> str:
