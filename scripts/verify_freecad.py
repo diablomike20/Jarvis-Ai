@@ -8,8 +8,11 @@ Runs a NEW temporary project. Never edits a user's existing .FCStd files.
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from actions.freecad_plugin import FreeCADPluginAdapter, find_freecad_cmd
 
