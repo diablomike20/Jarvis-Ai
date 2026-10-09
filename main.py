@@ -385,6 +385,9 @@ def _extract_skill_creation_goal(text: str) -> str | None:
     return goal.strip()
 
 
+_last_memory_input = ""
+
+
 def _update_memory_async(user_text: str, brahma_text: str) -> None:
     """Learn locally without depending on external OpenRouter credentials."""
     global _last_memory_input
