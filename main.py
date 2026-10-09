@@ -3760,6 +3760,17 @@ class BrahmaLive:
         except Exception as exc:
             result = {"success": False}
             message = f"Skill creation failed: {exc}"
+        if result.get("pending"):
+            feature_name = str(result.get("name") or "új skill")
+            response = (
+                f"A(z) {feature_name} funkció tervezete elkészült. "
+                "A kódot még nem futtattam. A képernyős jóváhagyás után "
+                "lefutnak a tesztek, és csak ezután aktiválódhat."
+            )
+            self.ui.write_log(f"JARVIS Skill Forge: {response}")
+            self.ui.write_log(f"JARVIS Skill Forge review: {result.get('review_path', '')}")
+            self.speak(response)
+            return response
         if result.get("success"):
             feature_name = str(result.get("name") or skill_name or "new feature")
             description = str(result.get("description") or "")
