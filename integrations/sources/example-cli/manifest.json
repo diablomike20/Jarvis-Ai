@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "id": "example-cli",
+  "name": "Example CLI Source",
+  "source_url": "https://github.com/OWNER/PROJECT",
+  "adapter": "cli_commands",
+  "enabled": false,
+  "aliases": [
+    "példa CLI eszköz"
+  ],
+  "executable_env": "JARVIS_EXAMPLE_CLI",
+  "capabilities": [
+    "Példa: információ lekérdezése",
+    "Példa: fájl konvertálása"
+  ],
+  "commands": [
+    {
+      "name": "version",
+      "description": "A program verziójának lekérdezése.",
+      "args": [
+        "--version"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "timeout_seconds": 10
+    },
+    {
+      "name": "convert",
+      "description": "Konvertálj át egy fájlt egy másik kimeneti fájlba.",
+      "args": [
+        "convert",
+        "--",
+        "{source}",
+        "{target}"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ]
+      },
+      "timeout_seconds": 120
+    }
+  ]
+}

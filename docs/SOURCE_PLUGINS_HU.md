@@ -117,3 +117,84 @@ python -m pytest -q tests/test_source_plugins.py tests/test_creative_studio.py
 A tesztek nem indítanak külső exe-t és nem tesztelik az ismeretlen
 source valódi szerkesztési képességeit. Azokat külön kell ellenőrizni
 a telepített programmal és mintaadatokkal.
+
+
+## Új lehetőség: hagyományos CLI programok beépítése MCP nélkül
+
+A JARVIS már két **általános** integrációs módot tud kezelni:
+
+- **\`mcp_stdio\`**: a forrásprogramnak már van MCP-eszközlistája.
+- **\`cli_commands\`**: a forrásprogram parancssori eszköz, de még nincs MCP-je.
+  Ilyenkor *mi* állítjuk össze a jóváhagyott parancsok deklarációját, és
+  ugyanúgy használhatók magyar nyelvű JARVIS-utasításokból.
+
+A PhotoCraft, LightCraft és FilmCraft az eredeti, külön ellenőrzött
+\`creative_studio\` adapteren marad. A két újrafelhasználható adapter nem
+kategóriafüggő, hanem a forrásprogram technikai csatlakozási módjától függ.
+
+Példa egy **csak mintaként szolgáló, letiltott** CLI integrációra:
+\`integrations/sources/example-cli/manifest.json\`.
+
+Saját ellenőrzött CLI-forráshoz például:
+
+\`\`\`json
+{
+  "schema_version": 1,
+  "id": "my-cli",
+  "name": "My CLI",
+  "source_url": "https://github.com/OWNER/REPO",
+  "adapter": "cli_commands",
+  "enabled": true,
+  "executable_env": "JARVIS_MY_CLI",
+  "aliases": ["saját CLI modul"],
+  "commands": [
+    {
+      "name": "version",
+      "description": "Verzió lekérdezése",
+      "args": ["--version"],
+      "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+      "name": "convert",
+      "description": "Kiválasztott fájl konvertálása",
+      "args": ["convert", "--", "{source}", "{target}"],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "source": {"type": "string"},
+          "target": {"type": "string"}
+        },
+        "required": ["source", "target"]
+      },
+      "timeout_seconds": 120
+    }
+  ]
+}
+\`\`\`
+
+A \`convert\` csak **példa**, és akkor működik, ha az adott
+forrásprogram tényleg pontosan ilyen parancsot támogat. Nem feltételezzük,
+hogy minden program ugyanazokat a paramétereket érti.
+
+A \`JARVIS_MY_CLI\` környezeti változó a már meglévő programfájl teljes
+elérési útját jelöli. A programnevet és a parancsok alakját a manifest
+rögzíti; az AI ezek helyett nem adhat tetszőleges shell-kódot.
+A \`{source}\` és \`{target}\` helyettesítők **önálló argumentumok**
+lehetnek, mindegyikhez típus és kötelezőség tartozik. Ismeretlen
+argumentum, extra CLI-kapcsoló vagy nem létező parancs elutasításra kerül.
+
+**Működés:** a JARVIS felfedezi a deklarált parancsokat, kiválasztja
+a feladatnak megfelelőt, majd a meglévő képernyős jóváhagyás után
+külön folyamatként, \`shell=False\` módban futtatja. A program a
+JARVIS helyi source-munkamappájában indul; önmagában ez nem biztonsági
+sandbox. Más projektekhez továbbra is szükség lehet egyedi adapterre.
+
+### Mit NEM csinál még?
+
+- Nem generál automatikusan működő integrációt egy ismeretlen GitHub URL-ből.
+- Nem építi le a teljes GUI-t a forrásprogramból.
+- Nem telepít, nem fordít, nem csomagol semmit.
+- Nem futtatja a modult automatikusan a manifest regisztrációjakor.
+
+A következő konkrét source esetén az eredeti API-t/parancskészletet
+ellenőrizve írjuk meg a hozzá tartozó \`manifest.json\`-t vagy adaptert.
