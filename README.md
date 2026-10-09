@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="assets/brahma_evo_logo.png" alt="Jarvis AI Logo" width="220" />
+<div align="center"><strong>◉ JARVIS AI</strong></div>
 
 ### *The Self-Evolving, Multimodal Personal AI Desktop Environment*
 
