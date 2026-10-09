@@ -152,3 +152,25 @@ def test_actual_gui_has_local_consent_and_background_worker():
     assert "_on_hu_voice_import_completed" in methods
     assert "Fájl" not in code or "QFileDialog.getOpenFileName" in code
     assert "QMessageBox.question" in code
+
+
+@pytest.mark.skipif(
+    __import__("shutil").which("ffmpeg") is None,
+    reason="This runner has no local FFmpeg installed",
+)
+def test_real_ffmpeg_converts_only_synthetic_wav(private_dir, tmp_path):
+    """Exercise real command line with generated silence; no user voice involved."""
+    source = tmp_path / "synthetic_input.wav"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(source), "wb") as handle:
+        handle.setnchannels(2)
+        handle.setsampwidth(2)
+        handle.setframerate(44100)
+        handle.writeframes(b"\\x00\\x00\\x00\\x00" * (44100 * 4))
+    dest = voice_reference.prepare_reference(source, start_seconds=0)
+    assert voice_reference._check_pcm_clip(dest)
+    with wave.open(str(dest), "rb") as ready:
+        assert ready.getnchannels() == 1
+        assert ready.getframerate() == 24000
+        assert ready.getsampwidth() == 2
+    assert source.is_file()
