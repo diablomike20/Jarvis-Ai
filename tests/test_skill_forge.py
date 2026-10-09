@@ -225,3 +225,27 @@ def test_revoking_generated_skill_archives_only_that_skill(tmp_path):
     finally:
         DynamicToolRegistry._skills = original_skills
         DynamicToolRegistry._initialized = original_initialized
+
+
+def test_changed_review_metadata_is_rejected_before_execution(tmp_path):
+    payload = _payload(name="metadata_check", code=(
+        "def execute(**kwargs):\n"
+        "    from pathlib import Path\n"
+        f"    Path({str(tmp_path / 'ran_meta.txt')!r}).write_text('executed')\n"
+        "    return True\n"
+    ))
+    stack, callbacks, old, old_initialized = _staging(tmp_path, payload)
+    try:
+        with stack:
+            result = SkillForge.forge_skill("metadata check")
+            proposal_path = Path(result["review_path"]).parent / "proposal.json"
+            import json
+            proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+            proposal["test_cases"] = []
+            proposal_path.write_text(json.dumps(proposal), encoding="utf-8")
+            assert "megváltozott" in callbacks[0]()
+            assert not (tmp_path / "ran_meta.txt").exists()
+            assert not (tmp_path / "features" / "metadata_check").exists()
+    finally:
+        DynamicToolRegistry._skills = old
+        DynamicToolRegistry._initialized = old_initialized
