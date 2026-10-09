@@ -30,29 +30,6 @@ BACKUPS_DIR = CONFIG_DIR / "patch_backups"
 API_CONFIG_PATH = CONFIG_DIR / "api_keys.json"
 
 
-def _get_gemini_api_key() -> str:
-    """Retrieves the Gemini API key from api_keys.json or environment variables."""
-    if API_CONFIG_PATH.exists():
-        try:
-            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                key = data.get("gemini_api_key", "").strip()
-                if key:
-                    return key
-        except Exception:
-            pass
-    return (os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")).strip()
-
-# Core files strictly protected from modification to prevent self-destruction
-PROTECTED_CORE_FILES = {
-    "boot_sentry.py",
-    "auto_heal_engine.py",
-    "setup.py",
-    "requirements.txt",
-    "version.txt",
-    "install_wizard.py",
-}
-
 
 # ── 1. Traceback Analyzer ───────────────────────────────────────────────────
 
@@ -388,35 +365,6 @@ Output ONLY a strict JSON object with these exact keys:
 }}
 Do NOT include markdown fences outside the JSON. Return only the valid JSON object.
 """
-        # 1. Primary: Google Gemini (Native directly via google.genai)
-        gemini_key = _get_gemini_api_key()
-        if gemini_key:
-            try:
-                from google import genai
-                g_client = genai.Client(api_key=gemini_key, http_options={"api_version": "v1beta"})
-                for model_name in ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"):
-                    try:
-                        resp = g_client.models.generate_content(
-                            model=model_name,
-                            contents=prompt,
-                            config={"temperature": 0.1, "response_mime_type": "application/json"}
-                        )
-                        raw_text = getattr(resp, "text", "") or ""
-                        if raw_text.strip():
-                            clean_json = raw_text.strip()
-                            if clean_json.startswith("```"):
-                                clean_json = re.sub(r"^```[a-zA-Z]*\n?", "", clean_json)
-                                clean_json = re.sub(r"\n?```$", "", clean_json).strip()
-                            data = json.loads(clean_json)
-                            if "target_chunk" in data and "replacement_chunk" in data:
-                                data["success"] = True
-                                return data
-                    except Exception as model_err:
-                        logger.warning(f"[AutoHeal] Gemini model {model_name} synthesis attempt failed: {model_err}")
-                        continue
-            except Exception as g_err:
-                logger.warning(f"[AutoHeal] Gemini synthesis failed: {g_err}")
-
         # 2. Fallback: Unified AI Client (llm_client.py)
         try:
             from llm_client import client as unified_client
@@ -447,7 +395,7 @@ Do NOT include markdown fences outside the JSON. Return only the valid JSON obje
 
         return {
             "success": False,
-            "error": "All LLM synthesis backends failed. Please verify your Gemini API key in config/api_keys.json."
+            "error": "All configured LLM synthesis backends failed. Check OpenRouter settings."
         }
 
 
