@@ -18,6 +18,7 @@ import json
 import os
 import queue
 import shutil
+import sys
 import subprocess
 import threading
 import time
@@ -97,6 +98,17 @@ def _binary_path(app: str) -> str | None:
         path = Path(override).expanduser()
         # Avoid treating untrusted command lines (executable + flags) as paths.
         return str(path.resolve()) if path.is_file() else None
+    # The full JARVIS installer includes all three engines under the
+    # PyInstaller runtime directory. No separately installed Rust CLI needed.
+    suffix = ".exe" if os.name == "nt" else ""
+    frozen_base = getattr(sys, "_MEIPASS", None)
+    roots = [Path(frozen_base)] if frozen_base else []
+    roots.append(Path(sys.executable).resolve().parent)
+    for root in roots:
+        packaged = root / "editor_engines" / app / (binary_name + suffix)
+        if packaged.is_file():
+            return str(packaged.resolve())
+
     found = shutil.which(binary_name)
     if found:
         return found
