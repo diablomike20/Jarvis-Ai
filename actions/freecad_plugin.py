@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,9 @@ CAD_TOOLS = {
         ["project", "source_path"]),
     "inspect_project": _tool("Inspect real FreeCAD object names, types, shape volumes and bounding boxes.",
                              {"project": PROJECT}, ["project"]),
+    "import_geometry": _tool("Import STEP, IGES, BREP, STL or OBJ geometry into an existing FreeCAD project.",
+        {"project": PROJECT, "source_path": _field("string", "Full path to a local CAD or mesh file.")},
+        ["project", "source_path"]),
     "add_primitive": _tool("Create editable parametric Part box, cylinder, sphere, cone.",
         {"project": PROJECT, "name": OBJECT,
          "kind": _field("string", "Shape type.", enum=["box", "cylinder", "sphere", "cone"]),
@@ -288,8 +292,23 @@ class FreeCADPluginAdapter:
             raise ValueError("Nincs ilyen FreeCAD-projekt: " + values["project"])
         if tool == "new_project" and project_file.exists():
             raise ValueError("Ilyen nevű FreeCAD-projekt már létezik.")
+        input_file = None
+        if tool == "import_geometry":
+            source = Path(values["source_path"]).expanduser().resolve()
+            if source.suffix.lower() not in (
+                ".step", ".stp", ".iges", ".igs", ".brep", ".stl", ".obj"
+            ) or not source.is_file():
+                raise ValueError("Nem támogatott vagy nem létező CAD/mesh importfájl.")
+            if source.stat().st_size > 100 * 1024 * 1024:
+                raise ValueError("Legfeljebb 100 MB-os CAD-fájl importálható.")
+            stage = workspace / "imports"
+            stage.mkdir(parents=True, exist_ok=True)
+            input_file = stage / (uuid.uuid4().hex + source.suffix.lower())
+            shutil.copy2(source, input_file)
         job = {
             "operation": tool, "arguments": values,
             "project_file": str(project_file), "workspace": str(workspace),
         }
+        if input_file is not None:
+            job["input_file"] = str(input_file)
         return self._invoke(job, workspace)
