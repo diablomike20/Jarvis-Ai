@@ -2062,6 +2062,33 @@ class BrahmaLive:
         except Exception as exc:
             self.ui.write_log(f"Creative Studio routing warning: {exc}")
 
+        # Other reviewed source repositories: route dynamically from their
+        # installed manifests rather than maintaining hardcoded category lists.
+        try:
+            from actions.source_intent import match_source_plugin
+            if match_source_plugin(text):
+                def _source_plugin_job():
+                    try:
+                        from actions.source_intent import execute_source_text
+                        response = execute_source_text(text)
+                        self.ui.write_log(f"JARVIS Source Plugin: {response}")
+                        if not self.ui.muted:
+                            if response.startswith("[CONFIRMATION_PENDING]"):
+                                self.speak("A művelet végrehajtásához képernyős jóváhagyás szükséges.")
+                            else:
+                                self.speak(response[:350])
+                    except Exception as exc:
+                        self.ui.write_log(f"Source plugin hiba: {exc}")
+                    finally:
+                        self.ui.set_state("LISTENING")
+                threading.Thread(
+                    target=_source_plugin_job, daemon=True,
+                    name="jarvis-source-plugin",
+                ).start()
+                return
+        except Exception as exc:
+            self.ui.write_log(f"Source plugin routing warning: {exc}")
+
         # Direct verbal toggle for Air-Gapped Offline Mode
         lower = text.lower().strip()
         if any(p in lower for p in ("switch to offline mode", "go offline", "turn on offline mode", "enable offline mode", "air gap mode")):
