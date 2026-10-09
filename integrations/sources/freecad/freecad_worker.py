@@ -58,6 +58,8 @@ def _new_project(path, options):
 
 
 def _add_primitive(doc, args):
+    if doc.getObject(args["name"]) is not None:
+        raise ValueError("A megadott objektumnév már foglalt.")
     kind = args["kind"]
     types = {
         "box": "Part::Box",
@@ -85,6 +87,8 @@ def _add_primitive(doc, args):
 
 
 def _sketch_pad(doc, args):
+    if doc.getObject(args["name"]) is not None:
+        raise ValueError("A megadott objektumnév már foglalt.")
     # A genuinely editable parametric PartDesign Pad, with an underlying sketch.
     import Sketcher  # noqa: F401
     body = doc.addObject("PartDesign::Body", args["name"])
@@ -105,6 +109,8 @@ def _sketch_pad(doc, args):
 
 
 def _combine(doc, args):
+    if doc.getObject(args["name"]) is not None:
+        raise ValueError("A megadott objektumnév már foglalt.")
     type_name = {
         "fuse": "Part::Fuse",
         "cut": "Part::Cut",
