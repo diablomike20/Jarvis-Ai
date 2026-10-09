@@ -1,6 +1,6 @@
-# Brahma Connect Android
+# Jarvis AI Connect Android
 
-Android agent for Brahma Connect.
+Android agent for Jarvis AI Connect.
 
 What this project is:
 - Native Android agent
