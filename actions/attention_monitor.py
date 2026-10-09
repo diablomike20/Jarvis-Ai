@@ -401,6 +401,16 @@ def _speak_edge_native(text: str, force_edge: bool = False) -> None:
     if not text:
         return
 
+    # The licensed, local Hungarian JARVIS voice has priority when configured.
+    # If no authorized WAV or XTTS installation is available, preserve Edge/SAPI.
+    if not force_edge:
+        try:
+            from actions.jarvis_voice import speak_authorized_hungarian
+            if speak_authorized_hungarian(text):
+                return
+        except Exception as exc:
+            print(f"[AttentionMonitor] Jarvis Hungarian voice unavailable: {exc}")
+
     # When entered fully local mode from settings, use the offline native male voice unless force_edge requested
     if not force_edge:
         try:
