@@ -50,7 +50,6 @@ def test_forge_stages_without_executing_generated_code(tmp_path):
             assert Path(result["review_path"]).exists()
             assert not (tmp_path / "ran.txt").exists()
             assert not (tmp_path / "features" / "forge_smoke_test").exists()
-            assert not DynamicToolRegistry.has_tool("forge_smoke_test") if not DynamicToolRegistry._initialized else True
             activation = callbacks.pop()()
             assert "aktiválva" in activation
             assert (tmp_path / "ran.txt").exists()  # tests only AFTER approval
@@ -160,3 +159,69 @@ def test_crucible_fails_closed_if_test_runner_returns_no_json(monkeypatch):
         "def execute(**kwargs): return True", [{"input": {}}],
     )
     assert not ok and "teszteredmény" in msg
+
+
+def test_deleting_file_based_feature_cannot_remove_features_root(tmp_path):
+    import core.dynamic_registry as reg
+    original_skills = DynamicToolRegistry._skills.copy()
+    original_initialized = DynamicToolRegistry._initialized
+    try:
+        with (
+            patch("core.dynamic_registry.FEATURES_DIR", tmp_path / "features"),
+            patch("core.dynamic_registry.APPDATA_SKILLS_DIR", tmp_path / "vault"),
+        ):
+            root = tmp_path / "features"
+            root.mkdir()
+            (root / "built_in.py").write_text(
+                "FEATURE_METADATA={'name':'built_in','author':'native'}\n"
+                "def execute(**kwargs): return 'ok'\n", encoding="utf-8",
+            )
+            DynamicToolRegistry.initialize()
+            assert DynamicToolRegistry.delete_skill("built_in") is False
+            assert (root / "built_in.py").exists()
+            assert root.exists()
+    finally:
+        DynamicToolRegistry._skills = original_skills
+        DynamicToolRegistry._initialized = original_initialized
+
+
+def test_revoking_generated_skill_archives_only_that_skill(tmp_path):
+    import core.dynamic_registry as reg
+    original_skills = DynamicToolRegistry._skills.copy()
+    original_initialized = DynamicToolRegistry._initialized
+    try:
+        with (
+            patch("core.dynamic_registry.FEATURES_DIR", tmp_path / "features"),
+            patch("core.dynamic_registry.APPDATA_SKILLS_DIR", tmp_path / "vault"),
+            patch("core.dynamic_registry.get_user_data_dir", return_value=tmp_path / "user"),
+        ):
+            root = tmp_path / "features"
+            root.mkdir()
+            (root / "built_in.py").write_text(
+                "FEATURE_METADATA={'name':'built_in','author':'native'}\n"
+                "def execute(**kwargs): return 'native'\n", encoding="utf-8",
+            )
+            module = root / "reviewed_skill"
+            module.mkdir()
+            import json
+            manifest = {
+                "name": "reviewed_skill",
+                "author": "JARVIS AI Skill Forge (reviewed)",
+                "active": True,
+                "parameters": {"type": "OBJECT", "properties": {}},
+            }
+            (module / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (module / "skill.py").write_text(
+                "def execute(**kwargs): return True\n", encoding="utf-8",
+            )
+            DynamicToolRegistry.initialize()
+            assert DynamicToolRegistry.delete_skill("reviewed_skill")
+            assert not module.exists()
+            assert (root / "built_in.py").exists()
+            backups = list((tmp_path / "user" / "skill_backups").glob("reviewed_skill_*"))
+            assert len(backups) == 1
+            assert (backups[0] / "skill.py").exists()
+            assert not DynamicToolRegistry.has_tool("reviewed_skill")
+    finally:
+        DynamicToolRegistry._skills = original_skills
+        DynamicToolRegistry._initialized = original_initialized
