@@ -1316,14 +1316,30 @@ def qcol(h: str, a: int = 255) -> QColor:
 
 
 def _logo_icon() -> QIcon:
-    return QIcon(str(LOGO_ICO if LOGO_ICO.exists() else LOGO_FILE))
+    # Runtime-generated Jarvis AI badge; avoids showing historic logo artwork
+    # while keeping the old resource filenames for installation compatibility.
+    return QIcon(_logo_pixmap(128))
 
 
 def _logo_pixmap(size: int) -> QPixmap:
-    pix = QPixmap(str(LOGO_FILE))
-    if pix.isNull():
-        return QPixmap(size, size)
-    return pix.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    size = max(16, int(size))
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    try:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setBrush(QColor("#080e17"))
+        painter.setPen(QPen(QColor("#00e5ff"), max(1, size // 32)))
+        margin = max(2, size // 16)
+        painter.drawRoundedRect(margin, margin, size - 2 * margin,
+                                size - 2 * margin, size * 0.24, size * 0.24)
+        font = QFont("Segoe UI", max(8, int(size * 0.36)), QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.setPen(QColor("#f4ffff"))
+        painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "J")
+    finally:
+        painter.end()
+    return pix
 
 
 def _framed_logo(size: int, icon_size: int | None = None, *, bg: str = "rgba(18,18,18,240)",
