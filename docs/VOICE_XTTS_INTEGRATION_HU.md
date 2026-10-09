@@ -113,3 +113,59 @@ nem tölti be és nem tölti le a hangmodellt.
 **Nem igazolt még**: Windows célgépes tényleges GUI-interakció,
 valós XTTS hangkimenet és az első modellletöltés. Ezt a tesztet
 csak a saját Windows-rendszereden lehet lezárni.
+
+
+## Helyi MP3/WAV importálás a JARVIS felületéből
+
+A hangreferenciát **nem kell többé kézzel FFmpeg-paranccsal konvertálni**.
+A valódi JARVIS Beállítások → System & Connectivity →
+Audio Routing & Hardware Controls részen:
+
+1. Kattints a **Helyi MP3/WAV hangminta kiválasztása** gombra.
+2. Válaszd ki a saját számítógépen lévő, megfelelően engedélyezett MP3/WAV fájlt.
+3. Add meg, hányadik másodperctől kérsz egy **25 másodperces** részletet.
+   Érdemes beszédet és nem háttérzenét tartalmazó szakaszt választani.
+4. A külön megerősítés után a JARVIS a gépre **már telepített FFmpeg**
+   program segítségével helyben előállítja a **24 kHz / mono / 16-bit PCM WAV**
+   fájlt; felülírja a korábbi helyi referenciát, de nem módosítja az
+   eredeti MP3/WAV forrásfájlt.
+5. Siker esetén a mentés helye változatlanul
+   `%LOCALAPPDATA%\BrahmaAI\voices\jarvis_hu_authorized.wav`.
+   A hangmintát a GUI nem tölti fel és nem helyezi GitHubra.
+6. Ezután a magyar XTTS a **Magyar XTTS hang engedélyezése** kapcsolóval,
+   a licenc-/jogosultság-jóváhagyás után kapcsolható be, és a
+   **Magyar hang kipróbálása** gombbal szólaltatható meg.
+
+Az FFmpeg-nek a Windows `PATH` környezeti változóban kell elérhetőnek lennie
+(`ffmpeg -version`). A funkció sem FFmpeg-et, sem XTTS-t nem telepít
+váratlanul. A konverzió külön Qt-szálon fut, és a kimeneti fájlt
+csak sikeres formátumellenőrzés után cseréli le.
+
+Ha a `JARVIS_VOICE_REFERENCE` környezeti változó korábban külön helyi
+útvonalra lett állítva, továbbra is az élvez elsőbbséget; ilyenkor
+a felület figyelmeztet az eltérésre. A privát hangfájl teljes útvonala
+nem kerül a GUI státuszszövegébe, sem a CI-naplóba.
+
+## Windows környezet előkészítése
+
+Az aktuális Coqui telepítési útmutató szerint a `coqui-tts` 0.27.4-től
+külön kell telepíteni a PyTorch-ot. A PyTorch-verzió (és esetleges
+`torchcodec`), valamint a CPU/CUDA build kiválasztása a célgéptől függ.
+Hivatalos útmutató:
+https://coqui-tts.readthedocs.io/en/latest/installation.html
+
+**Lényeges**: a telepítésnek abban a Python-környezetben kell megtörténnie,
+amelyből a JARVIS AI-t indítod. Másik venv-be telepített XTTS-t
+az alkalmazás nem fogja magától megtalálni.
+
+A privát MP3-ból készített WAV **nem garancia** a hangminőségre:
+a Windows helyi próbán ellenőrizd a magyar kiejtést, a hanghasonlóságot,
+a megszakítást és a régi Edge/SAPI tartalék működését.
+
+## CI és bizonyíték
+
+A hangintegráció új tesztjei csak mesterséges WAV-ot és mock FFmpeg-et
+használnak. Windows alatt is ellenőrzik a kód és az útvonalak
+kompatibilitását, de **nem végeznek valódi XTTS modellfuttatást**.
+A forrásban a hangminta, a személyes adatok és a modellfájlok továbbra
+sem szerepelnek.
