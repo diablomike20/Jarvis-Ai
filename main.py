@@ -3456,7 +3456,7 @@ class BrahmaLive:
             request_text = f"{memory_ctx}\n\nCurrent User Request:\n{text}" if memory_ctx else text
             app_settings = config_manager.load_settings()
             configured_provider = app_settings.get("default_ai_provider", "OpenRouter")
-            if configured_provider in ("OpenRouter", "Google OpenRouter"):
+            if configured_provider in ("Gemini", "Google Gemini"):
                 configured_provider = "OpenRouter"
             local_model_target = app_settings.get("local_ai_model", "qwen2.5:3b")
             is_offline_mode = app_settings.get("offline_mode_enabled", False)
@@ -3567,7 +3567,7 @@ class BrahmaLive:
                 except Exception as e_loc:
                     print(f"[BRAHMA EVO] ⚠️ Local Brain failed: {e_loc}")
 
-            # No OpenRouter fallback. OpenRouter errors fall back to the local model.
+            # OpenRouter errors fall back to the local Ollama model when available.
 
             # 4. Ultimate offline safety net: Local Brain fallback
             if not reply and local_brain.is_available():
@@ -3597,7 +3597,7 @@ class BrahmaLive:
                     print(f"[BRAHMA EVO] ⚠️ Offline Local Brain fallback failed: {e_net}")
             reply = (reply or "").strip()
             if not reply:
-                reply = "I’m ready, sir."
+                reply = "Nem sikerült választ kapnom. Ellenőrizd az OpenRouter-kulcsot vagy indítsd el az Ollamát."
             self.ui.write_log(f"Brahma Evo: {reply}")
             if not getattr(self.ui, "muted", False):
                 self.speak(reply, proactive=True)
@@ -4504,112 +4504,86 @@ class BrahmaLive:
             await self.session.send_realtime_input(media=msg)
 
     async def _listen_audio(self):
-        print("[BRAHMA EVO] 🎤 Mic started")
-        loop = asyncio.get_event_loop()
-        import numpy as np
-
-        _mic_name = config_manager.get_input_device()
-        _mic_dev = audio_devices.resolve(_mic_name, "input") if _mic_name else None
-        available_inputs = audio_devices.list_devices("input")
-        if _mic_dev is None and available_inputs:
-            _mic_name = available_inputs[0]
-            _mic_dev = audio_devices.resolve(_mic_name, "input")
-        if _mic_dev is None:
-            self.ui.write_log(
-                "SYS: No usable microphone is available at the configured sample rate. "
-                "Voice input is paused; text and mobile remote remain available."
-            )
-            while True:
-                await asyncio.sleep(60)
-
-        speech_buffer = bytearray()
-        silence_chunks = 0
-
-        def callback(indata, frames, time_info, status):
-            nonlocal silence_chunks
-            with self._speaking_lock:
-                brahma_speaking = self._is_speaking
-            if self._phone_active:
-                return
-
-            if getattr(self, "_ptt_enabled", False) and not getattr(self, "_ptt_held", False):
-                data = np.zeros_like(indata).tobytes()
-                loop.call_soon_threadsafe(
-                    self.out_queue.put_nowait,
-                    {"data": data, "mime_type": "audio/pcm"}
-                )
-                return
-            
-            if not self.ui.muted or getattr(self.ui, "_wakeword_listening", False):
-                lvl = float(np.sqrt(np.mean(np.square(indata, dtype=np.float32))))
-                
-                # Handle Local AI voice input when in Local or Offline mode
-                app_cfg = config_manager.load_settings()
-                if app_cfg.get("default_ai_provider") == "Local" or app_cfg.get("offline_mode_enabled", False):
-                    if not brahma_speaking and not self.ui.muted:
-                        if lvl > 22.0:
-                            speech_buffer.extend(indata.tobytes())
-                            silence_chunks = 0
-                        elif len(speech_buffer) > 0:
-                            silence_chunks += 1
-                            # ~0.7s of silence (each chunk is ~30ms -> 20 chunks)
-                            if silence_chunks > 18:
-                                captured = bytes(speech_buffer)
-                                speech_buffer.clear()
-                                silence_chunks = 0
-                                if len(captured) > (SEND_SAMPLE_RATE * 2 * 0.5):
-                                    def _process_local_speech(pcm_bytes):
-                                        try:
-                                            import speech_recognition as sr
-                                            r = sr.Recognizer()
-                                            audio_data = sr.AudioData(pcm_bytes, SEND_SAMPLE_RATE, 2)
-                                            text_cmd = r.recognize_google(audio_data)
-                                            if text_cmd and len(text_cmd.strip()) > 1:
-                                                print(f"[Local AI Voice] 🎙️ Heard: {text_cmd}")
-                                                self._on_text_command(text_cmd, source="mic")
-                                        except Exception:
-                                            pass
-                                    threading.Thread(target=_process_local_speech, args=(captured,), daemon=True).start()
-
-                if brahma_speaking:
-                    if self._echo.is_user_speech(indata, SEND_SAMPLE_RATE, lvl) and lvl > 28.0:
-                        loop.call_soon_threadsafe(self.trigger_barge_in)
-                        data = indata.tobytes()
-                    else:
-                        data = np.zeros_like(indata).tobytes()
-                else:
-                    if not self.ui.muted:
-                        try:
-                            self.ui.set_audio_level(min(1.0, lvl / 1200.0))
-                        except Exception:
-                            pass
-                    if self._echo._hist:
-                        self._echo.reset()
-                    if lvl > 10.0:
-                        data = indata.tobytes()
-                    else:
-                        data = np.zeros_like(indata).tobytes()
-                    
-                loop.call_soon_threadsafe(
-                    self.out_queue.put_nowait,
-                    {"data": data, "mime_type": "audio/pcm"}
-                )
+        """Capture mic commands for offline Hungarian Whisper, independent of Gemini."""
+        from actions.local_stt import SpeechSegmenter, transcribe_pcm
 
         try:
+            _mic_name = config_manager.get_input_device()
+            _mic_dev = audio_devices.resolve(_mic_name, "input") if _mic_name else None
+            if _mic_dev is None:
+                available = audio_devices.list_devices("input")
+                if available:
+                    _mic_name = available[0]
+                    _mic_dev = audio_devices.resolve(_mic_name, "input")
+            if _mic_dev is None:
+                self.ui.write_log("SYS: No microphone available; text commands remain active.")
+                return
+
+            import numpy as np
+            # Local STT runs in a worker, not the realtime PortAudio callback.
+            endpoint = SpeechSegmenter(sample_rate=SEND_SAMPLE_RATE)
+            recognition_lock = threading.Lock()
+            settings = config_manager.load_settings()
+            threshold = max(80, min(2000, int(settings.get("stt_energy_threshold", 260))))
+
+            def process_utterance(audio_bytes: bytes):
+                if not recognition_lock.acquire(blocking=False):
+                    return
+                try:
+                    command = transcribe_pcm(audio_bytes, SEND_SAMPLE_RATE)
+                    if command and len(command) > 1:
+                        self.ui.write_log(f"SYS: Magyar beszéd felismerve: {command}")
+                        self._on_text_command(command, source="mic")
+                except Exception as exc:
+                    print(f"[Jarvis STT] Hungarian recognition failed: {exc}")
+                    try:
+                        self.ui.write_log(f"ERR: Helyi beszédfelismerés: {exc}")
+                    except Exception:
+                        pass
+                finally:
+                    recognition_lock.release()
+
+            def callback(indata, frames, time_info, status):
+                try:
+                    with self._speaking_lock:
+                        speaking = self._is_speaking
+                    active = not self.ui.muted and not speaking and not self._phone_active
+                    samples = indata.astype(np.float32)
+                    energy = float(np.sqrt(np.mean(samples * samples)))
+                    if active:
+                        self.ui.set_audio_level(min(1.0, energy / 1800.0))
+                    recorded = endpoint.feed(
+                        indata.tobytes(),
+                        active=active,
+                        voiced=energy >= threshold,
+                        ptt=bool(self._ptt_enabled),
+                        held=bool(self._ptt_held),
+                    )
+                    if recorded:
+                        threading.Thread(
+                            target=process_utterance, args=(recorded,),
+                            daemon=True, name="jarvis-hungarian-stt",
+                        ).start()
+                except Exception as exc:
+                    print(f"[Jarvis STT] Audio callback: {exc}")
+
             with sd.InputStream(
                 samplerate=SEND_SAMPLE_RATE,
-                channels=CHANNELS,
+                channels=1,
                 dtype="int16",
                 blocksize=CHUNK_SIZE,
                 device=_mic_dev,
                 callback=callback,
             ):
-                print(f"[BRAHMA EVO] 🎤 Mic stream open ({_mic_name or 'Default'})")
+                self.ui.write_log(
+                    "SYS: Magyar offline beszédfelismerés elindult "
+                    f"({_mic_name or 'Alapértelmezett mikrofon'})."
+                )
                 while True:
-                    await asyncio.sleep(0.1)
-        except Exception as e:
-            print(f"[BRAHMA EVO] ❌ Mic: {e}")
-            raise
+                    await asyncio.sleep(0.5)
+        except Exception as exc:
+            print(f"[Jarvis STT] Microphone unavailable: {exc}")
+            self.ui.write_log(f"SYS: A mikrofon nem indult: {exc}. Szöveges vezérlés elérhető.")
 
     async def _receive_audio(self):
         print("[BRAHMA EVO] 👂 Recv started")
@@ -4727,6 +4701,18 @@ class BrahmaLive:
     async def run(self):
         """Start local services without any OpenRouter Live connection."""
         self._attention_monitor.start()
+        # Gemini Live removed. Restore microphone input via local Hungarian STT.
+        try:
+            from actions.local_stt import is_available as local_stt_available
+            if local_stt_available():
+                asyncio.create_task(self._listen_audio())
+            else:
+                self.ui.write_log(
+                    "SYS: Magyar mikrofonos vezérléshez telepítsd: "
+                    "python -m pip install -r requirements-voice.txt"
+                )
+        except Exception as exc:
+            print(f"[Jarvis STT] Startup skipped: {exc}")
         self._loop = None
         self.session = None
         if self._dashboard is not None:
