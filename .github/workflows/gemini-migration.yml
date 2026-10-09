@@ -17,9 +17,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Compile Python modules without importing native Windows extensions
-        run: |
-          python -m compileall -q main.py ui.py llm_client.py or_client.py actions agent core memory
+      - name: Compile main.py
+        run: python -m py_compile main.py
+      - name: Compile ui.py
+        run: python -m py_compile ui.py
+      - name: Compile API clients
+        run: python -m py_compile llm_client.py or_client.py
+      - name: Compile supporting modules
+        run: python -m compileall -q actions agent core memory
       - name: Install lightweight test dependencies
         run: |
           python -m pip install --disable-pip-version-check numpy requests pytest
