@@ -71,7 +71,7 @@
 ## 🛠️ Core Capabilities
 
 ### 🎙️ Multimodal Native Audio & Vision
-- Sub-500ms low-latency conversation via OpenRouter / local Ollama.
+- Text chat via OpenRouter free models or a local Ollama model; response latency varies by provider and hardware.
 - Live webcam and desktop screen vision for real-time document analysis, code debugging, and hardware component recognition.
 
 ### 🖥️ Deep Windows Desktop Orchestration
@@ -102,14 +102,26 @@
 
 This branch removes the Google Gemini SDK, API key, provider selection and Gemini Live
 runtime. **Text chat** uses OpenRouter or local Ollama. Screen/camera image analysis uses
-an OpenRouter vision model (requires a configured OpenRouter key and internet).
+a free OpenRouter vision-capable model (requires a configured OpenRouter key and internet), or a locally configured vision-capable Ollama model.
 Spoken replies use the native/Edge TTS fallback.
 
 **Important:** the former Gemini Live always-on microphone conversation is not replaced
-by this migration. Microphone-based realtime conversation requires a separate STT/voice
-integration. Existing Gemini keys in user-local config files are no longer read by
+by this migration. Optional Hungarian microphone transcription is supported through local faster-whisper (see the setup below). Existing Gemini keys in user-local config files are no longer read by
 the application; delete them manually if desired. The application still contains
 legacy Brahma branding and upstream license restrictions.
+
+## Gemini nélkül: magyar mikrofon és ingyenes modellek
+
+A jelenlegi csereág az OpenRouter [ingyenes modellválasztóját](https://openrouter.ai/openrouter/free)
+használja alapértelmezésként, és a korábbi fizetős képelemzési modellt is
+eltávolítja. A mikrofonos magyar parancsokhoz az opcionális `faster-whisper`
+modult telepítheted:
+
+```powershell
+python -m pip install -r requirements-voice.txt
+```
+
+[Teljes magyar Gemini-csere útmutató](docs/GEMINI_MIGRATION_HU.md).
 
 ## 🚀 Quick Start
 
@@ -118,7 +130,7 @@ legacy Brahma branding and upstream license restrictions.
 - **Python 3.11** or **Python 3.12**
 - **Git**
 - Speakers (optional; OpenRouter-powered screen and camera analysis available)
-- **OpenRouter API Key** (Get from [Google AI Studio](https://aistudio.google.com/))
+- **OpenRouter API Key** (Get from [OpenRouter](https://openrouter.ai/settings/keys))
 
 ### Installation
 
