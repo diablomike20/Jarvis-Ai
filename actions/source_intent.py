@@ -23,8 +23,12 @@ def match_source_plugin(text: str) -> str | None:
         if not plugin["enabled"]:
             continue
         aliases = [plugin_id.replace("-", " "), plugin["name"].casefold()]
-        # Avoid single short generic words triggering accidental commands.
-        if any(len(alias) >= 5 and alias in lower for alias in aliases):
+        aliases.extend(str(name).casefold() for name in plugin.get("aliases", []))
+        # Match full names/aliases, so a small plugin id cannot intercept
+        # unrelated words accidentally (e.g. 'art' in 'start').
+        if any(len(alias) >= 5 and re.search(
+            r"(?<!\w)" + re.escape(alias) + r"(?!\w)", lower
+        ) for alias in aliases):
             names.append(plugin_id)
     return names[0] if len(names) == 1 else None
 
