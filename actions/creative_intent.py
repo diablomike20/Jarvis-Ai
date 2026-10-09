@@ -23,7 +23,7 @@ _HINTS = {
     "filmcraft": ("videó", "video", "klip", "idővonal", "filmvág", "felirat", "timeline"),
 }
 _INTENT = (
-    "javíts", "szerkes", "vág", "alakíts", "export", "import", "dolgozz",
+    "javíts", "szerkes", "vág", "alakíts", "állíts", "export", "import", "dolgozz",
     "készíts", "módos", "rend", "helyez", "nyisd", "ments", "adj hozzá",
     "mutasd", "tedd", "korrig", "kever", "színezz", "világos", "sötét",
 )
