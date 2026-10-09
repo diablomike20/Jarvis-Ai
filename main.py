@@ -1791,6 +1791,63 @@ TOOL_DECLARATIONS = [
 ]
 
 
+# Universal bridge to the genuine editor engines; the same command registry
+# exposes image, RAW and video editing tools without hardcoding their features.
+TOOL_DECLARATIONS.append({
+    "name": "creative_studio",
+    "description": (
+        "PhotoCraft, LightCraft and FilmCraft integrated Creative Studio. "
+        "Use for PSD layers/masks/filters, photo library/RAW processing/presets/"
+        "batch export, video timelines/transitions/keyframes/audio/captions/render. "
+        "First call operation='catalogue' or 'status', then 'discover' to find "
+        "the exact MCP tool and its arguments, then 'inspect' for safe reads or "
+        "'execute' for edits. Edits request a real on-screen confirmation."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "app": {"type": "STRING", "description": "photocraft | lightcraft | filmcraft | all (catalogue/status only)"},
+            "operation": {"type": "STRING", "description": "catalogue | status | discover | inspect | execute"},
+            "filter": {"type": "STRING", "description": "Keyword for discover, e.g. layers, mask, develop, audio, timeline"},
+            "limit": {"type": "INTEGER", "description": "Number of matching tools to list, max 60"},
+            "steps": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"tool": {"type": "STRING"}, "arguments": {"type": "OBJECT"}}}, "description": "Up to 8 MCP tool calls; each mutating batch requires on-screen consent."},
+            "tool": {"type": "STRING", "description": "Exact MCP tool name returned from discover"},
+            "arguments": {"type": "OBJECT", "description": "JSON arguments of the selected MCP tool"},
+        },
+        "required": ["app", "operation"],
+    },
+})
+
+
+# Any user-reviewed source repo can appear here with a local integration manifest.
+TOOL_DECLARATIONS.append({
+    "name": "source_plugins",
+    "description": (
+        "Use a modular source-repository integration installed under "
+        "integrations/sources. List registered GitHub source projects, inspect "
+        "their supported MCP tools, and perform source actions after a real "
+        "human HUD confirmation. Works for future reviewed projects as well "
+        "as PhotoCraft, LightCraft and FilmCraft. NEVER assume that supplying "
+        "a GitHub URL alone automatically installs or safely runs its code."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {"type": "STRING", "description": "list | status | discover | inspect | execute | batch"},
+            "plugin": {"type": "STRING", "description": "Source plugin id from list"},
+            "filter": {"type": "STRING", "description": "Filter for MCP tool discovery"},
+            "limit": {"type": "INTEGER", "description": "Maximum tools, up to 60"},
+            "tool": {"type": "STRING", "description": "Exact MCP tool name from discovery"},
+            "arguments": {"type": "OBJECT", "description": "Verified MCP tool parameters"},
+            "steps": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {
+                "tool": {"type": "STRING"}, "arguments": {"type": "OBJECT"}
+            }}, "description": "1-8 MCP operations requiring HUD confirmation"},
+        },
+        "required": ["action"],
+    },
+})
+
+
 class BrahmaLive:
 
     def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
@@ -1977,6 +2034,60 @@ class BrahmaLive:
         if getattr(self, "_email_mode", False):
             if self._handle_email_flow(text):
                 return
+
+        # Creative Studio: voice/text commands go through the local editor MCP
+        # registry; writes require the HUD confirmation issued by core.confirm.
+        try:
+            from actions.creative_intent import recognize_creative_intent
+            if recognize_creative_intent(text):
+                def _creative_job():
+                    from actions.creative_intent import handle_creative_text
+                    try:
+                        self.ui.set_state("THINKING")
+                        answer = handle_creative_text(text)
+                        self.ui.write_log(f"JARVIS Creative Studio: {answer}")
+                        if not self.ui.muted:
+                            if answer.startswith("[CONFIRMATION_PENDING]"):
+                                self.speak("A szerkesztési művelethez jóváhagyást kérek a képernyőn.")
+                            else:
+                                self.speak(answer[:380])
+                    except Exception as exc:
+                        self.ui.write_log(f"Creative Studio hiba: {exc}")
+                    finally:
+                        self.ui.set_state("LISTENING")
+                threading.Thread(
+                    target=_creative_job, daemon=True, name="jarvis-creative-studio"
+                ).start()
+                return
+        except Exception as exc:
+            self.ui.write_log(f"Creative Studio routing warning: {exc}")
+
+        # Other reviewed source repositories: route dynamically from their
+        # installed manifests rather than maintaining hardcoded category lists.
+        try:
+            from actions.source_intent import match_source_plugin
+            if match_source_plugin(text):
+                def _source_plugin_job():
+                    try:
+                        from actions.source_intent import execute_source_text
+                        response = execute_source_text(text)
+                        self.ui.write_log(f"JARVIS Source Plugin: {response}")
+                        if not self.ui.muted:
+                            if response.startswith("[CONFIRMATION_PENDING]"):
+                                self.speak("A művelet végrehajtásához képernyős jóváhagyás szükséges.")
+                            else:
+                                self.speak(response[:350])
+                    except Exception as exc:
+                        self.ui.write_log(f"Source plugin hiba: {exc}")
+                    finally:
+                        self.ui.set_state("LISTENING")
+                threading.Thread(
+                    target=_source_plugin_job, daemon=True,
+                    name="jarvis-source-plugin",
+                ).start()
+                return
+        except Exception as exc:
+            self.ui.write_log(f"Source plugin routing warning: {exc}")
 
         # Direct verbal toggle for Air-Gapped Offline Mode
         lower = text.lower().strip()
@@ -3765,6 +3876,24 @@ class BrahmaLive:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, undo_stack.undo_last)
             self.speak("Undone.")
+            self.ui.set_state("LISTENING")
+            return SimpleNamespace(name=name, id=fc.id, response={"result": result})
+
+        elif name == "source_plugins":
+            from actions.source_plugins import source_plugins
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, lambda: source_plugins(args, player=self.ui)
+            )
+            self.ui.set_state("LISTENING")
+            return SimpleNamespace(name=name, id=fc.id, response={"result": result})
+
+        elif name == "creative_studio":
+            from actions.creative_studio import creative_studio
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, lambda: creative_studio(args, player=self.ui)
+            )
             self.ui.set_state("LISTENING")
             return SimpleNamespace(name=name, id=fc.id, response={"result": result})
 

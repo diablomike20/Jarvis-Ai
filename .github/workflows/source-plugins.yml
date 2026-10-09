@@ -1,0 +1,29 @@
+name: Creative source plugin checks
+
+on:
+  push:
+    branches:
+      - feature/creative-studio-multiapp
+  pull_request:
+    branches:
+      - main
+      - remove-gemini-openrouter-local
+
+jobs:
+  source-plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Syntax validation
+        run: |
+          python -m py_compile main.py actions/creative_studio.py actions/creative_intent.py actions/source_plugins.py actions/source_intent.py core/local_brain.py
+      - name: Dependencies for bridge tests
+        run: |
+          python -m pip install -q pytest requests numpy
+      - name: Run generic source plugin tests
+        run: python -m pytest -q tests/test_source_plugins.py
+      - name: Run Creative Studio editor tests
+        run: python -m pytest -q tests/test_creative_studio.py

@@ -18,7 +18,7 @@ CORE_LOCAL_TOOL_NAMES = {
     "youtube_video", "web_search", "weather_report", "file_controller",
     "smart_organizer", "desktop_control", "execute_protocol", "reminder",
     "word_document", "pdf_document", "dev_agent", "recall_memory",
-    "save_memory", "shutdown_brahma", "undo"
+    "save_memory", "shutdown_brahma", "undo", "source_plugins", "creative_studio"
 }
 
 
