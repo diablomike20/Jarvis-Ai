@@ -1819,6 +1819,35 @@ TOOL_DECLARATIONS.append({
 })
 
 
+# Any user-reviewed source repo can appear here with a local integration manifest.
+TOOL_DECLARATIONS.append({
+    "name": "source_plugins",
+    "description": (
+        "Use a modular source-repository integration installed under "
+        "integrations/sources. List registered GitHub source projects, inspect "
+        "their supported MCP tools, and perform source actions after a real "
+        "human HUD confirmation. Works for future reviewed projects as well "
+        "as PhotoCraft, LightCraft and FilmCraft. NEVER assume that supplying "
+        "a GitHub URL alone automatically installs or safely runs its code."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {"type": "STRING", "description": "list | status | discover | inspect | execute | batch"},
+            "plugin": {"type": "STRING", "description": "Source plugin id from list"},
+            "filter": {"type": "STRING", "description": "Filter for MCP tool discovery"},
+            "limit": {"type": "INTEGER", "description": "Maximum tools, up to 60"},
+            "tool": {"type": "STRING", "description": "Exact MCP tool name from discovery"},
+            "arguments": {"type": "OBJECT", "description": "Verified MCP tool parameters"},
+            "steps": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {
+                "tool": {"type": "STRING"}, "arguments": {"type": "OBJECT"}
+            }}, "description": "1-8 MCP operations requiring HUD confirmation"},
+        },
+        "required": ["action"],
+    },
+})
+
+
 class BrahmaLive:
 
     def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
@@ -3820,6 +3849,15 @@ class BrahmaLive:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, undo_stack.undo_last)
             self.speak("Undone.")
+            self.ui.set_state("LISTENING")
+            return SimpleNamespace(name=name, id=fc.id, response={"result": result})
+
+        elif name == "source_plugins":
+            from actions.source_plugins import source_plugins
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, lambda: source_plugins(args, player=self.ui)
+            )
             self.ui.set_state("LISTENING")
             return SimpleNamespace(name=name, id=fc.id, response={"result": result})
 
