@@ -5,6 +5,8 @@ on:
     branches:
       - feature/creative-studio-multiapp
       - feature/universal-source-adapters
+      - feature/universal-source-adapters
+      - feature/freecad-native-jarvis
   pull_request:
     branches:
       - main
@@ -21,7 +23,7 @@ jobs:
           python-version: '3.11'
       - name: Syntax validation
         run: |
-          python -m py_compile main.py actions/creative_studio.py actions/creative_intent.py actions/source_plugins.py actions/source_intent.py actions/source_cli_adapter.py core/local_brain.py
+          python -m py_compile main.py actions/creative_studio.py actions/creative_intent.py actions/source_plugins.py actions/source_intent.py actions/source_cli_adapter.py actions/freecad_plugin.py integrations/sources/freecad/freecad_worker.py core/local_brain.py
       - name: Dependencies for bridge tests
         run: |
           python -m pip install -q pytest requests numpy
@@ -31,3 +33,5 @@ jobs:
         run: python -m pytest -q tests/test_creative_studio.py
       - name: Run generic CLI source adapter tests
         run: python -m pytest -q tests/test_source_cli_adapter.py
+      - name: Run FreeCAD native adapter tests
+        run: python -m pytest -q tests/test_freecad_plugin.py
