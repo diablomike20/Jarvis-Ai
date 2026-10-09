@@ -3504,7 +3504,8 @@ class BrahmaLive:
                         "- You have FULL DIRECT ACCESS and authority over this Windows PC via your tools.\n"
                         "- NEVER state that you are a text-based AI, that you cannot perform automations, or that you lack real-time access.\n"
                         "- Whenever the user requests an action (opening an app, changing volume, setting a reminder, running a protocol, organizing files, searching, etc.), ALWAYS call the corresponding tool.\n"
-                        "- Keep responses concise, direct, and conversational.\n"\n                        "- Respond in natural Hungarian unless the user explicitly requests another language."
+                        "- Keep responses concise, direct, and conversational.\n"
+                        "- Respond in natural Hungarian unless the user explicitly requests another language."
                     )
 
                     messages = [
