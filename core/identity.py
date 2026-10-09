@@ -43,20 +43,17 @@ class IdentityService:
                 with open(self.config_file, "r", encoding="utf-8") as f:
                     loaded_data = json.load(f)
                     
-                    # Deep merge to preserve defaults for missing keys
+                    # Keep existing custom user identity, migrate only old default names.
                     for section, values in loaded_data.items():
                         if section in self.data and isinstance(values, dict):
                             self.data[section].update(values)
-                    # Migrate historic default branding without overriding
-                    # a genuinely custom assistant/application name.
+                        else:
+                            self.data[section] = values
                     assistant = self.data.get("assistant", {})
                     if isinstance(assistant, dict):
                         for key in ("name", "application_name"):
-                            value = assistant.get(key)
-                            if value in ("Brahma", "Brahma Evo", "Brahma AI Evo"):
+                            if assistant.get(key) in ("Brahma", "Brahma Evo", "Brahma AI Evo"):
                                 assistant[key] = "Jarvis AI"
-                        else:
-                            self.data[section] = values
             except Exception as e:
                 print(f"Error loading identity config: {e}")
         else:
