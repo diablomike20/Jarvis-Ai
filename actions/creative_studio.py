@@ -288,7 +288,7 @@ def creative_studio(parameters: dict | None = None, player=None) -> str:
     """Entry point for the built-in Jarvis tool declaration.
 
     Operations: catalogue, status, discover, inspect (read-only MCP tool),
-    execute (requires HUD confirmation unless known read-only).
+    execute and batch (require HUD confirmation unless all tools are read-only).
     """
     params = parameters or {}
     app = str(params.get("app", "all")).strip().lower()
@@ -330,8 +330,42 @@ def creative_studio(parameters: dict | None = None, player=None) -> str:
                 {"app": app, "total_matches": len(matched), "tools": matched[:limit]},
                 ensure_ascii=False,
             )
+        if operation == "batch":
+            steps = params.get("steps")
+            if not isinstance(steps, list) or not 1 <= len(steps) <= 8:
+                return "A batch 1-8 lépést fogad listában."
+            available = session.list_tools()
+            prepared = []
+            for entry in steps:
+                if not isinstance(entry, dict):
+                    return "Minden lépésnek JSON-objektumnak kell lennie."
+                tool_name = entry.get("tool")
+                tool_args = entry.get("arguments", {})
+                if not isinstance(tool_name, str) or tool_name not in available:
+                    return f"Nem létező MCP eszköz: {tool_name}."
+                if not isinstance(tool_args, dict):
+                    return "Minden arguments mezőnek JSON-objektumnak kell lennie."
+                prepared.append((tool_name, tool_args))
+            if len(json.dumps(steps, ensure_ascii=False, default=str)) > _MAX_INPUT_BYTES:
+                return "Túl hosszú batch."
+            def run_batch():
+                results = []
+                for tool_name, tool_args in prepared:
+                    result = session.call_tool(tool_name, tool_args)
+                    results.append(_public_result(app, tool_name, result))
+                    if isinstance(result, dict) and result.get("isError"):
+                        break
+                return "\n".join(results)
+            if all(name in READ_ONLY_TOOLS[app] for name, _ in prepared):
+                return run_batch()
+            from core.confirm import request
+            return request(
+                "creative-batch-" + app, f"Creative Studio: {app} batch",
+                f"Engedélyezed ezt a {len(prepared)} lépéses műveletet? "
+                + ", ".join(name for name, _ in prepared), run_batch,
+            )
         if operation not in ("execute", "inspect"):
-            return "Műveletek: catalogue, status, discover, inspect, execute."
+            return "Műveletek: catalogue, status, discover, inspect, execute, batch."
 
         tool = str(params.get("tool", "")).strip()
         args = params.get("arguments", {})
