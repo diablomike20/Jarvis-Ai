@@ -1,4 +1,4 @@
-Write-Host "Building Brahma Evo Application..." -ForegroundColor Cyan
+Write-Host "Building Jarvis AI Application..." -ForegroundColor Cyan
 .\.venv\Scripts\pyinstaller.exe installer\BrahmaEvo.spec --noconfirm
 
 if ($LASTEXITCODE -ne 0) {
