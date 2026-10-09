@@ -8,7 +8,6 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6%20%2B%20WebEngine-darkgreen?logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
-[![Gemini 2.5](https://img.shields.io/badge/Model-Gemini%202.5%20Flash%20Native%20Audio-orange?logo=google&logoColor=white)](https://ai.google.dev/)
 [![MCP](https://img.shields.io/badge/Protocol-Model%20Context%20Protocol-purple)](https://modelcontextprotocol.io/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?logo=windows&logoColor=white)](https://microsoft.com/windows)
 
@@ -60,7 +59,7 @@
 
 ### 8. ⚙️ Centralized API Setup Hub
 - Complete Settings UI featuring dedicated cards for every connected service:
-  - Google Gemini API (Live Voice & Vision)
+  - OpenRouter API (text and image understanding)
   - Spotify MCP (Client ID & Client Secret)
   - OpenRouter / Anthropic
   - Weather & Radar APIs
@@ -72,7 +71,7 @@
 ## 🛠️ Core Capabilities
 
 ### 🎙️ Multimodal Native Audio & Vision
-- Sub-500ms low-latency conversation via Gemini 2.5 Flash Native Audio.
+- Sub-500ms low-latency conversation via OpenRouter / local Ollama.
 - Live webcam and desktop screen vision for real-time document analysis, code debugging, and hardware component recognition.
 
 ### 🖥️ Deep Windows Desktop Orchestration
@@ -99,21 +98,34 @@
 
 ---
 
+## Gemini removal (Jarvis fork)
+
+This branch removes the Google Gemini SDK, API key, provider selection and Gemini Live
+runtime. **Text chat** uses OpenRouter or local Ollama. Screen/camera image analysis uses
+an OpenRouter vision model (requires a configured OpenRouter key and internet).
+Spoken replies use the native/Edge TTS fallback.
+
+**Important:** the former Gemini Live always-on microphone conversation is not replaced
+by this migration. Microphone-based realtime conversation requires a separate STT/voice
+integration. Existing Gemini keys in user-local config files are no longer read by
+the application; delete them manually if desired. The application still contains
+legacy Brahma branding and upstream license restrictions.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 - **Windows 10 / 11** (64-bit)
 - **Python 3.11** or **Python 3.12**
 - **Git**
-- Working Microphone & Speakers (Webcam optional for vision)
-- **Google Gemini API Key** (Get from [Google AI Studio](https://aistudio.google.com/))
+- Speakers (optional; OpenRouter-powered screen and camera analysis available)
+- **OpenRouter API Key** (Get from [Google AI Studio](https://aistudio.google.com/))
 
 ### Installation
 
 1. **Clone the repository:**
    ```powershell
-   git clone https://github.com/titechprabhasolutions/Brahma-Ai-Evo.git
-   cd Brahma-Ai-Evo
+   git clone https://github.com/diablomike20/Jarvis-Ai.git
+   cd Jarvis-Ai
    ```
 
 2. **Run the Automated Setup:**
@@ -128,7 +140,7 @@
 3. **Configure API Keys:**
    - Launch Brahma AI Evo.
    - Click the **Settings** icon on the top navigation bar.
-   - Enter your **Gemini API Key** and any optional credentials (Spotify MCP, Weather, etc.) into the respective cards.
+   - Enter your **OpenRouter API Key** and any optional credentials (Spotify MCP, Weather, etc.) into the respective cards.
    - Click **Save & Connect**.
 
 ---
