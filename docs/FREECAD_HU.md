@@ -17,6 +17,7 @@ JARVIS saját megerősítő felületén jóváhagyást kér.
 | `new_project` | Üres natív `.FCStd` projekt létrehozása |
 | `import_fcstd` | Létező `.FCStd` dokumentum behozatala |
 | `inspect_project` | Valódi geometria, méret, térfogat, objektumlista |
+| `import_geometry` | STEP, IGES, BREP, STL vagy OBJ geometria importálása meglévő projektbe |
 | `add_primitive` | Parametrikus doboz, henger, gömb, kúp |
 | `sketch_pad` | PartDesign Body + Sketcher téglalapvázlat + Pad |
 | `boolean` | Egyesítés, kivonás, közös térfogat |
@@ -95,6 +96,8 @@ tölti vissza a geometriát. Ez megőrzi a paraméteres szerkesztési
 
 ```powershell
 python -m pytest -q tests/test_freecad_plugin.py
+# Telepített FreeCADCmd esetén célgépes, izolált CAD-próba:
+python scripts/verify_freecad.py
 ```
 
 A GitHub CI szintaxis- és unit-teszteket futtat. Ezek a bemenetek,
