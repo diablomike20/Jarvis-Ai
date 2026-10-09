@@ -5,7 +5,6 @@ import io
 import json
 import sys
 from pathlib import Path
-import requests
 import cv2
 import mss
 import mss.tools
@@ -17,13 +16,6 @@ except ImportError:
 
 API_CONFIG_PATH = get_user_data_dir() / "config" / "api_keys.json"
 IMG_MAX_W, IMG_MAX_H, JPEG_Q = 640, 360, 55
-
-def _openrouter_key():
-    try:
-        data = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
-        return (data.get("openrouter_api_key") or "").strip()
-    except (OSError, ValueError):
-        return ""
 
 def _get_camera_index() -> int:
     try:
@@ -143,9 +135,6 @@ def screen_process(parameters: dict, response: str | None = None, player=None,
         if player and hasattr(player, "set_scanning"):
             player.set_scanning(False, "")
         return False
-    api_key = _openrouter_key()
-    if not api_key:
-        return fail("OpenRouter API key required for screen analysis.")
     if player and hasattr(player, "set_scanning"):
         player.set_scanning(True, "SCANNING SCREEN")
     try:
@@ -158,30 +147,15 @@ def screen_process(parameters: dict, response: str | None = None, player=None,
             else:
                 image_bytes = _capture_screenshot()
         image_bytes = _to_jpeg(image_bytes)
-        payload = {
-            "model": "openai/gpt-4o-mini",
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": question},
-                    {"type": "image_url", "image_url": {
-                        "url": "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("ascii")
-                    }}
-                ]
-            }],
-            "max_tokens": 600
-        }
-        reply = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": "Bearer " + api_key,
-                     "Content-Type": "application/json"},
-            json=payload, timeout=45
+        from llm_client import client as unified_ai_client
+        # Honors OpenRouter/free or locally configured vision-capable Ollama.
+        answer = unified_ai_client.vision(
+            question,
+            base64.b64encode(image_bytes).decode("ascii"),
+            mime="image/jpeg",
+            system="Describe the image accurately and concisely in Hungarian.",
+            max_tokens=600,
         )
-        reply.raise_for_status()
-        answer = reply.json()["choices"][0]["message"]["content"]
-        if isinstance(answer, list):
-            answer = " ".join(item.get("text", "") for item in answer
-                              if isinstance(item, dict))
         if player and hasattr(player, "write_log"):
             player.write_log("Jarvis (Vision): " + str(answer))
         if player and hasattr(player, "show_content"):
