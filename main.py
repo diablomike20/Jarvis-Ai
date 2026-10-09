@@ -49,8 +49,7 @@ except Exception:
     pass
 
 import sounddevice as sd
-from google import genai
-from google.genai import types
+from types import SimpleNamespace
 from ui import BrahmaUI
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
@@ -121,17 +120,11 @@ BASE_DIR        = get_base_dir()
 API_CONFIG_PATH = get_user_data_dir() / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
 STARTUP_LOG     = Path(os.environ.get("LOCALAPPDATA", str(BASE_DIR))) / "Brahma Evo" / "startup.log"
-LIVE_MODEL          = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 CHANNELS            = 1
 SEND_SAMPLE_RATE    = 16000
 RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE          = 1024
 LIVE_CONNECT_TIMEOUT = 12
-
-
-def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
 
 
 def _is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
@@ -282,107 +275,30 @@ def _speak_daily_briefing(ui=None, speak=None) -> None:
     except Exception as e:
         print(f"[DailyBriefing] Error: {e}")
     
-def _extract_gemini_text(response) -> str:
-    text_parts: list[str] = []
+def _cloud_text_reply(prompt: str) -> str:
+    """OpenRouter text response; local fallback is handled by the request router."""
+    return openrouter_client.chat(
+        prompt, system="You are Jarvis, a concise and helpful desktop assistant."
+    )
+
+
+def _ig_cloud_reply(username: str, text: str) -> str:
+    prompt = f"Instagram DM from {username}: {text}"
     try:
-        for candidate in getattr(response, "candidates", []) or []:
-            content = getattr(candidate, "content", None)
-            if not content:
-                continue
-            for part in getattr(content, "parts", []) or []:
-                part_text = getattr(part, "text", None)
-                if part_text:
-                    text_parts.append(part_text)
+        return openrouter_client.chat(
+            prompt, system="You are Jarvis. Reply naturally in at most two sentences."
+        )
     except Exception:
-        pass
+        return "I'm busy right now; I'll get back to you later."
 
-    text = "".join(text_parts).strip()
-    if text:
-        return text
 
+def _clipboard_cloud_reply(text: str) -> str:
     try:
-        return (getattr(response, "text", "") or "").strip()
+        return openrouter_client.chat(
+            text, system="Comment briefly and helpfully on this clipboard text."
+        )
     except Exception:
         return ""
-
-
-def _gemini_text_reply(prompt: str) -> str:
-    client = genai.Client(
-        api_key=_get_api_key(),
-        http_options={"api_version": "v1beta"},
-    )
-    system_prompt = (
-        "You are Brahma Evo, a concise, helpful desktop assistant. "
-        "Reply naturally and briefly. Do not mention internal implementation details."
-    )
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=f"{system_prompt}\n\nUser: {prompt}",
-        config={"temperature": 0.6},
-    )
-    return _extract_gemini_text(response)
-
-
-def _ig_gemini_reply(username: str, text: str) -> str:
-    system_prompt = (
-        "You are Brahma Evo, an AI personal assistant acting on behalf of your user. "
-        "You have taken over their Instagram chat with the user's permission. "
-        "Reply naturally, briefly, and conversationally to the incoming message. "
-        "Do not sound like a bot. Keep your replies under 2 sentences."
-    )
-    prompt = f"Instagram DM from {username}: {text}"
-    
-    try:
-        client = genai.Client(
-            api_key=_get_api_key(),
-            http_options={"api_version": "v1beta"},
-        )
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"{system_prompt}\n\nUser: {prompt}",
-            config={"temperature": 0.6},
-        )
-        return _extract_gemini_text(response)
-    except Exception as e:
-        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or _is_gemini_limit_error(e):
-            print("[InstagramChat] Gemini Rate Limit hit, falling back to OpenRouter...")
-            try:
-                from llm_client import client as openrouter_client
-                return openrouter_client.chat(prompt, system=system_prompt)
-            except Exception as or_e:
-                print(f"[InstagramChat] OpenRouter fallback failed: {or_e}")
-                return "Hey, I'm currently busy. I will get back to you later!"
-        print(f"[InstagramChat] Gemini Reply Error: {e}")
-        return "Hey, I'm currently busy. I will get back to you later!"
-
-
-def _clipboard_gemini_reply(text: str) -> str:
-    system_prompt = (
-        "You are Brahma Evo, a witty and helpful AI assistant. "
-        "The user just copied the following text to their clipboard. "
-        "Make a very short, interesting, or helpful 1-sentence comment or question about it. "
-        "Do not offer to 'help' or ask 'how can I help'. Just make a standalone witty observation or summary."
-    )
-    prompt = text
-    try:
-        client = genai.Client(
-            api_key=_get_api_key(),
-            http_options={"api_version": "v1beta"},
-        )
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"{system_prompt}\n\nClipboard Text: {prompt}",
-            config={"temperature": 0.8},
-        )
-        return _extract_gemini_text(response)
-    except Exception as e:
-        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or _is_gemini_limit_error(e):
-            try:
-                from llm_client import client as openrouter_client
-                return openrouter_client.chat(prompt, system=system_prompt)
-            except Exception:
-                pass
-        return "Interesting stuff you copied there!"
 
 
 def _looks_like_code_request(text: str) -> bool:
@@ -469,176 +385,18 @@ def _extract_skill_creation_goal(text: str) -> str | None:
     return goal.strip()
 
 
-def _is_gemini_limit_error(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return any(token in msg for token in (
-        "429",
-        "resource_exhausted",
-        "quota",
-        "rate limit",
-        "too many requests",
-        "exceeded",
-        "1008",
-        "access denied",
-        "permission denied",
-    ))
-
-
-def _looks_like_screen_request(text: str) -> bool:
-    t = (text or "").lower()
-    if not t:
-        return False
-    direct_phrases = (
-        "what's on my screen",
-        "whats on my screen",
-        "what is on my screen",
-        "what's on screen",
-        "check my screen",
-        "look at my screen",
-        "analyze my screen",
-        "analyse my screen",
-        "tell me what's on my screen",
-        "tell me what is on my screen",
-        "read my screen",
-        "what does my screen say",
-        "explain this error",
-        "what's this error",
-        "what is this error",
-        "explain the error",
-        "look at this error",
-        "explain what's on my screen",
-        "inspect my screen",
-        "what am i looking at",
-    )
-    if any(p in t for p in direct_phrases):
-        return True
-    screen_words = ("screen", "display", "monitor", "window")
-    request_words = ("what", "check", "look", "analy", "analyse", "analyze", "read", "tell", "answer", "see", "explain")
-    has_screen_target = any(re.search(rf"\b{re.escape(word)}\b", t) for word in screen_words)
-    has_screen_request = any(re.search(rf"\b{re.escape(word)}\b", t) for word in request_words)
-    return has_screen_target and has_screen_request
-
-
-def _looks_like_daily_briefing_request(text: str) -> bool:
-    normalized = re.sub(r"\s+", " ", (text or "").lower()).strip()
-    phrases = (
-        "daily briefing", "morning briefing", "morning update", "daily update",
-        "brief me", "give me a briefing", "briefing for today", "what's happening today",
-        "whats happening today", "what is happening today",
-    )
-    return any(phrase in normalized for phrase in phrases)
-
-
-def _wakeword_detected(text: str) -> bool:
-    t = re.sub(r"[^a-z0-9\s]+", " ", (text or "").lower())
-    words = [w for w in t.split() if w]
-    if not words:
-        return False
-    phrases = (
-        "brahma evo",
-        "hey brahma evo",
-        "hi brahma evo",
-        "hello brahma evo",
-        "hey",
-        "hi",
-        "hello",
-    )
-    compact = " ".join(words)
-    if compact in phrases or any(p in compact for p in phrases):
-        return True
-    return any(word in {"brahma evo", "hey", "hi", "hello"} for word in words)
-
-
-def _build_task_plan(text: str) -> list[str]:
-    t = (text or "").lower()
-    if any(word in t for word in ("presentation", "ppt", "slides", "deck")):
-        return [
-            "Understand the topic and goal",
-            "Build a slide structure",
-            "Generate and format the deck",
-            "Open the finished presentation",
-        ]
-    if any(word in t for word in ("spreadsheet", "excel", "sheet", "table", "tracker", "budget")):
-        return [
-            "Read the data request",
-            "Lay out sheets and columns",
-            "Apply formulas and formatting",
-            "Open the workbook",
-        ]
-    if any(word in t for word in ("word", "docx", "document", "report", "letter")):
-        return [
-            "Understand the document type",
-            "Draft the structure and content",
-            "Preserve formatting and polish",
-            "Save the editable file",
-        ]
-    if any(word in t for word in ("website", "web site", "landing page", "saaS", "saas", "dashboard", "app")):
-        return [
-            "Interpret the brief",
-            "Generate frontend and backend files",
-            "Launch the local preview",
-            "Debug and fix launch issues if needed",
-        ]
-    if any(word in t for word in ("browser", "website", "google", "search", "open url", "navigate")):
-        return [
-            "Open the browser",
-            "Navigate to the target page",
-            "Collect the needed information",
-            "Return the result",
-        ]
-    if any(word in t for word in ("screen", "camera", "meeting", "call", "analyze", "analyse", "analyze")):
-        return [
-            "Capture the live screen or camera",
-            "Inspect what is visible",
-            "Answer with the important details",
-            "Keep listening for follow-up commands",
-        ]
-    if any(word in t for word in ("fan", "light", "plug", "kasa", "atomberg", "smart home", "home device", "room", "bedroom", "living room", "kitchen", "office", "bathroom", "balcony")):
-        return [
-            "Identify the smart-home device or room",
-            "Choose the correct action",
-            "Send the command to the connected provider",
-            "Confirm the result back to the user",
-        ]
-    return [
-        "Understand the command",
-        "Choose the right tool",
-        "Execute the task",
-        "Return the result",
-    ]
-
-
-_last_memory_input = ""
-
 def _update_memory_async(user_text: str, brahma_text: str) -> None:
+    """Learn locally without depending on external OpenRouter credentials."""
     global _last_memory_input
-
-    user_text   = (user_text   or "").strip()
-    brahma_text = (brahma_text or "").strip()
-
+    user_text = (user_text or "").strip()
     if len(user_text) < 4 or user_text == _last_memory_input:
         return
     _last_memory_input = user_text
-
-    # Fast deterministic heuristic extraction (Pillar 5 - Living Knowledge Graph)
     try:
-        learned = auto_learn_interaction(user_text, brahma_text)
-        if learned:
-            print(f"[Memory] 🧠 Auto-learned: {list(learned.keys())}")
+        auto_learn_interaction(user_text, brahma_text)
     except Exception as exc:
-        print(f"[Memory] ⚠️ Auto-learn error: {exc}")
+        print(f"[Memory] Auto-learn error: {exc}")
 
-    try:
-        api_key = _get_api_key()
-        if not should_extract_memory(user_text, brahma_text, api_key):
-            return
-        data = extract_memory(user_text, brahma_text, api_key)
-        if data:
-            update_memory(data)
-            print(f"[Memory] ✅ {list(data.keys())}")
-    except Exception as e:
-        if "429" not in str(e):
-            print(f"[Memory] ⚠️ {e}")
 
 def _memory_context_for_request(text: str) -> str:
     try:
@@ -2236,7 +1994,7 @@ class BrahmaLive:
 
         if any(p in lower for p in ("switch to online mode", "go online", "turn off offline mode", "disable offline mode")):
             config_manager.set_setting("offline_mode_enabled", False)
-            config_manager.set_setting("default_ai_provider", "Google Gemini")
+            config_manager.set_setting("default_ai_provider", "OpenRouter")
             self.ui.write_log("🌐 SYSTEM: Offline Mode DISENGAGED. Cloud connectivity restored.")
             self.speak("Online mode restored, sir. Cloud connectivity is active.", proactive=True)
             return
@@ -2824,7 +2582,7 @@ class BrahmaLive:
             return
         # Route directly to Local Brain if preferred by user in settings or in air-gapped offline mode
         app_settings = config_manager.load_settings()
-        configured_provider = app_settings.get("default_ai_provider", "Gemini")
+        configured_provider = app_settings.get("default_ai_provider", "OpenRouter")
         is_offline_mode = bool(app_settings.get("offline_mode_enabled", False))
 
         # If offline mode or Local provider selected, route directly to Local Brain
@@ -3314,7 +3072,7 @@ class BrahmaLive:
             "Reply text:"
         )
         try:
-            return _gemini_text_reply(prompt) or user_text
+            return _cloud_text_reply(prompt) or user_text
         except Exception:
             try:
                 return openrouter_client.chat(
@@ -3379,13 +3137,8 @@ class BrahmaLive:
             "Output ONLY valid JSON: {\"intent\": \"...\", \"reply_text\": \"...\"}"
         )
         try:
-            client = genai.Client(api_key=_get_api_key(), http_options={"api_version": "v1beta"})
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=f"{system_prompt}\n\nUser Response: {text}",
-                config={"temperature": 0.1, "response_mime_type": "application/json"}
-            )
-            data = json.loads(response.text.strip())
+            raw = openrouter_client.chat(text, system=system_prompt)
+            data = json.loads(raw.strip())
             return data.get("intent", "IGNORE"), data.get("reply_text", "")
         except Exception:
             lower = text.lower()
@@ -3427,7 +3180,7 @@ class BrahmaLive:
                 add_auto_thread(thread_id)
                 def _generate_and_send():
                     try:
-                        reply = _ig_gemini_reply(username, message_text)
+                        reply = _ig_cloud_reply(username, message_text)
                         send_direct_reply(thread_id, reply)
                     except Exception as e:
                         print(f"Error taking over thread: {e}")
@@ -3697,31 +3450,14 @@ class BrahmaLive:
             except Exception:
                 pass
             reply = ""
-            gemini_first = not self._use_openrouter_first
             request_text = f"{memory_ctx}\n\nCurrent User Request:\n{text}" if memory_ctx else text
-
             app_settings = config_manager.load_settings()
-            configured_provider = app_settings.get("default_ai_provider", "Gemini")
+            configured_provider = app_settings.get("default_ai_provider", "OpenRouter")
+            if configured_provider in ("OpenRouter", "Google OpenRouter"):
+                configured_provider = "OpenRouter"
             local_model_target = app_settings.get("local_ai_model", "qwen2.5:3b")
             is_offline_mode = app_settings.get("offline_mode_enabled", False)
-
-            is_cloud_gemini = configured_provider in ("Gemini", "Google Gemini")
             is_cloud_openrouter = configured_provider == "OpenRouter"
-
-            # 1. If user explicitly selected Google Gemini, run Gemini FIRST
-            if is_cloud_gemini and not is_offline_mode:
-                try:
-                    self.ui.update_task_workspace(
-                        status="Thinking (Gemini)",
-                        output="Processing on Google Gemini...",
-                        percent=50,
-                    )
-                    reply = _gemini_text_reply(request_text)
-                    print("[BRAHMA EVO] 🌐 Google Gemini answered successfully!")
-                except Exception as e_gem:
-                    print(f"[BRAHMA EVO] ⚠️ Gemini failed: {e_gem}")
-                    if _is_gemini_limit_error(e_gem):
-                        self._use_openrouter_first = True
 
             # 2. If user explicitly selected OpenRouter, run OpenRouter FIRST
             elif is_cloud_openrouter and not is_offline_mode:
@@ -3743,7 +3479,7 @@ class BrahmaLive:
                     print(f"[BRAHMA EVO] ⚠️ OpenRouter failed: {e_or}")
 
             # 3. If user explicitly configured Local AI, is in Offline Mode, or cloud provider failed: run Local Brain
-            if not reply and (configured_provider == "Local" or is_offline_mode or not (is_cloud_gemini or is_cloud_openrouter)) and local_brain.is_available():
+            if not reply and local_brain.is_available():
                 try:
                     self.ui.update_task_workspace(
                         status="Thinking (Local AI)",
@@ -3828,18 +3564,7 @@ class BrahmaLive:
                 except Exception as e_loc:
                     print(f"[BRAHMA EVO] ⚠️ Local Brain failed: {e_loc}")
 
-            # 4. Fallback cascading: if primary cloud choice failed, try secondary cloud choice
-            if not reply and not is_offline_mode:
-                if is_cloud_gemini and self._use_openrouter_first:
-                    try:
-                        reply = openrouter_client.chat(request_text)
-                    except Exception:
-                        pass
-                elif is_cloud_openrouter:
-                    try:
-                        reply = _gemini_text_reply(request_text)
-                    except Exception:
-                        pass
+            # No OpenRouter fallback. OpenRouter errors fall back to the local model.
 
             # 4. Ultimate offline safety net: Local Brain fallback
             if not reply and local_brain.is_available():
@@ -3935,28 +3660,8 @@ class BrahmaLive:
         if not text:
             return
 
-        if self.session and self._loop:
-            # Route text through Gemini Live API for the unified native Charon voice
-            import asyncio
-            async def _send():
-                try:
-                    prompt = f"System Alert / Context: {text}\n\nPlease relay this information to me naturally now."
-                    await self.session.send(input=prompt, end_of_turn=True)
-                except Exception as e:
-                    print(f"[BRAHMA EVO] Unified Speak (Charon) err: {e}")
-                    def _fallback():
-                        try:
-                            self.set_speaking(True)
-                            from actions.attention_monitor import _speak_edge_native
-                            _speak_edge_native(text)
-                        except Exception as exc:
-                            print(f"[Brahma Speak] Fallback TTS failed: {exc}")
-                        finally:
-                            self.set_speaking(False)
-                    threading.Thread(target=_fallback, daemon=True).start()
-            asyncio.run_coroutine_threadsafe(_send(), self._loop)
-        else:
-            # Fallback when Gemini Live is disconnected or in offline mode
+        if True:
+            # Native speech engine, independent of any cloud AI provider.
             def _speak_thread():
                 try:
                     self.set_speaking(True)
@@ -4039,76 +3744,7 @@ class BrahmaLive:
             pass
         return message
 
-    def _build_config(self) -> types.LiveConnectConfig:
-        from datetime import datetime
-
-        memory     = load_memory()
-        mem_str    = format_memory_for_prompt(memory)
-        sys_prompt = _load_system_prompt()
-
-        now      = datetime.now()
-        time_str = now.strftime("%A, %B %d, %Y — %I:%M %p")
-        time_ctx = (
-            f"[CURRENT DATE & TIME]\n"
-            f"Right now it is: {time_str}\n"
-            f"Use this to calculate exact times for reminders.\n\n"
-        )
-
-        loc_ctx = ""
-        try:
-            from core.device_location import get_device_city
-            dev_city = get_device_city(default="")
-            if dev_city and dev_city != "Local Area":
-                loc_ctx = (
-                    f"[DEVICE PHYSICAL LOCATION]\n"
-                    f"Current device location: {dev_city}\n"
-                    f"Use this location for local weather, time zone, and neighborhood context.\n\n"
-                )
-        except Exception:
-            pass
-
-        parts = [time_ctx]
-        if loc_ctx:
-            parts.append(loc_ctx)
-        if mem_str:
-            parts.append(mem_str)
-        parts.append(sys_prompt)
-        parts.append(
-            "Wake-word mode: if the microphone is muted, still listen for the words 'Brahma Evo', 'hey', 'hi', and 'hello'. "
-            "When you hear one of these activation cues, keep the session friendly and concise, "
-            "and wait for the user's next command. "
-            "IMPORTANT: Do NOT speak an unprompted generic greeting (like 'Thank you, how can I help you?') upon connecting. "
-            "Remain completely silent until the user speaks to you or asks a question."
-        )
-
-        tool_declarations = list(TOOL_DECLARATIONS)
-        declared_names = {tool.get("name") for tool in tool_declarations}
-        try:
-            from core.dynamic_registry import DynamicToolRegistry
-            for declaration in DynamicToolRegistry.get_tool_declarations():
-                if declaration.get("name") not in declared_names:
-                    tool_declarations.append(declaration)
-                    declared_names.add(declaration.get("name"))
-        except Exception as exc:
-            print(f"[SkillRegistry] Dynamic tools unavailable: {exc}")
-
-        return types.LiveConnectConfig(
-            response_modalities=["AUDIO"],
-            output_audio_transcription={},
-            input_audio_transcription={},
-            system_instruction="\n".join(parts),
-            tools=[{"function_declarations": tool_declarations}],
-            session_resumption=types.SessionResumptionConfig(handle=getattr(self, '_resume_handle', None)),
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Charon"
-                    )
-                )
-            ),
-        )
-
-    async def _execute_tool(self, fc) -> types.FunctionResponse:
+    async def _execute_tool(self, fc):
         name = fc.name
         args = dict(fc.args or {})
 
@@ -4168,13 +3804,13 @@ class BrahmaLive:
                 result = await loop.run_in_executor(None, undo_stack.undo_last)
             self.speak("Undone.")
             self.ui.set_state("LISTENING")
-            return types.FunctionResponse(name=name, id=fc.id, response={"result": result})
+            return SimpleNamespace(name=name, id=fc.id, response={"result": result})
 
         elif name == "recall_memory":
             query = args.get("query", "")
             result = search_memory(query, limit=8)
             self.ui.set_state("LISTENING")
-            return types.FunctionResponse(name=name, id=fc.id, response={"result": result})
+            return SimpleNamespace(name=name, id=fc.id, response={"result": result})
 
         elif name == "execute_protocol":
             protocol_name = args.get("protocol", "")
@@ -4182,12 +3818,12 @@ class BrahmaLive:
             msg = res.get("result", res.get("error", "Protocol completed."))
             self.speak(msg)
             self.ui.set_state("LISTENING")
-            return types.FunctionResponse(name=name, id=fc.id, response={"result": res})
+            return SimpleNamespace(name=name, id=fc.id, response={"result": res})
 
         elif name == "get_sensorium_telemetry":
             snapshot = sensorium.get_snapshot()
             self.ui.set_state("LISTENING")
-            return types.FunctionResponse(name=name, id=fc.id, response={"result": snapshot})
+            return SimpleNamespace(name=name, id=fc.id, response={"result": snapshot})
 
         elif name == "manage_local_model":
             action = args.get("action", "status")
@@ -4220,7 +3856,7 @@ class BrahmaLive:
 
             self.speak(msg)
             self.ui.set_state("LISTENING")
-            return types.FunctionResponse(name=name, id=fc.id, response={"result": res})
+            return SimpleNamespace(name=name, id=fc.id, response={"result": res})
 
         if name == "save_memory":
             category = args.get("category", "notes")
@@ -4235,7 +3871,7 @@ class BrahmaLive:
                     pass
             if not self.ui.muted:
                 self.ui.set_state("LISTENING")
-            return types.FunctionResponse(
+            return SimpleNamespace(
                 id=fc.id, name=name,
                 response={"result": "ok", "silent": True}
             )
@@ -4345,7 +3981,7 @@ class BrahmaLive:
                         message_text = self._ig_pending_thread.get('message')
                         def _generate_and_send():
                             try:
-                                reply = _ig_gemini_reply(username, message_text)
+                                reply = _ig_cloud_reply(username, message_text)
                                 send_direct_reply(thread_id, reply)
                             except Exception as e:
                                 print(f"Error taking over thread: {e}")
@@ -4602,7 +4238,7 @@ class BrahmaLive:
                         lambda: (start_call_proxy(event, ui=self.ui, speak_fn=self.speak) and "Call screening started.")
                     )
                     self.ui.set_state("LISTENING")
-                    return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
+                    return SimpleNamespace(id=fc.id, name=name, response={"result": result})
                 else:
                     result = "Choose start, take_over, or hang_up."
             elif name == "skill_forge":
@@ -4624,7 +4260,7 @@ class BrahmaLive:
                         ).start()
                         result = f"Started creating the requested skill: {goal}"
                         self.ui.set_state("LISTENING")
-                        return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
+                        return SimpleNamespace(id=fc.id, name=name, response={"result": result})
                 else:
                     result = "Choose forge or list."
             elif name == "dynamic_skill":
@@ -4816,7 +4452,7 @@ class BrahmaLive:
 
         print(f"[BRAHMA EVO] 📤 {name} → {str(result)[:80]}")
 
-        return types.FunctionResponse(
+        return SimpleNamespace(
             id=fc.id, name=name,
             response={"result": result}
         )
@@ -5086,110 +4722,27 @@ class BrahmaLive:
             stream.close()
 
     async def run(self):
-        # announce boot steps to UI overlay (thread-safe wrappers)
-        try:
-            self.ui.boot_add_step("Load configuration")
-            self.ui.boot_add_step("Start attention monitor")
-            self.ui.boot_add_step("Start dashboard server")
-            self.ui.boot_add_step("Initialize audio")
-            self.ui.boot_add_step("Connect AI backend")
-            self.ui.boot_add_step("Finalize startup")
-            self.ui.boot_set_progress(3, "Preparing startup...")
-        except Exception:
-            pass
-
+        """Start local services without any OpenRouter Live connection."""
         self._attention_monitor.start()
-        try:
-            self.ui.boot_set_step_status("Start attention monitor", "done")
-            self.ui.boot_set_progress(12, "Attention monitor online")
-        except Exception:
-            pass
+        self._loop = None
+        self.session = None
         if self._dashboard is not None:
             if not self._dashboard_started:
                 self._dashboard_started = True
                 asyncio.create_task(self._serve_dashboard())
-                try:
-                    self.ui.boot_set_step_status("Start dashboard server", "done")
-                    self.ui.boot_set_progress(22, "Mobile connect server running")
-                except Exception:
-                    pass
             asyncio.create_task(self._consume_remote_commands())
-            asyncio.create_task(self._relay_phone_audio())
+        self.ui.set_state("LISTENING")
+        self.ui.write_log("SYS: Jarvis online — OpenRouter / local AI.")
         try:
-            self.ui.boot_set_progress(36, "Initializing AI client")
+            self.ui.boot_set_progress(100, "Jarvis ready")
         except Exception:
             pass
-
-        client = genai.Client(
-            api_key=_get_api_key(),
-            http_options={"api_version": "v1beta"}
-        )
-
+        if not self._startup_briefing_started:
+            self._startup_briefing_started = True
+            threading.Thread(target=_speak_daily_briefing,
+                             args=(self.ui, self.speak), daemon=True).start()
         while True:
-            try:
-                print("[BRAHMA EVO] 🔌 Connecting...")
-                self.ui.set_state("THINKING")
-                config = self._build_config()
-
-                connect_cm = client.aio.live.connect(model=LIVE_MODEL, config=config)
-                session = await asyncio.wait_for(connect_cm.__aenter__(), timeout=LIVE_CONNECT_TIMEOUT)
-                try:
-                    async with asyncio.TaskGroup() as tg:
-                        self.session        = session
-                        self._loop          = asyncio.get_event_loop()
-                        self.audio_in_queue = asyncio.Queue()
-                        self.out_queue      = asyncio.Queue()  # Fix: removed maxsize=10 to prevent dropping packets
-                        
-                        print("[BRAHMA EVO] ✅ Connected.")
-                        try:
-                            self.ui.boot_set_step_status("Connect AI backend", "done")
-                            self.ui.boot_set_progress(75, "AI backend connected")
-                        except Exception:
-                            pass
-                        self.ui.set_state("LISTENING")
-                        self.ui.write_log("SYS: Brahma Evo online.")
-
-                        tg.create_task(self._send_realtime())
-                        tg.create_task(self._listen_audio())
-                        tg.create_task(self._relay_phone_audio())
-                        tg.create_task(self._receive_audio())
-                        tg.create_task(self._play_audio())
-                        if not self._startup_briefing_started:
-                            self._startup_briefing_started = True
-                            threading.Thread(
-                                target=_speak_daily_briefing,
-                                args=(self.ui, self.speak),
-                                daemon=True,
-                                name="daily-briefing",
-                            ).start()
-                        try:
-                            self.ui.boot_set_step_status("Initialize audio", "done")
-                            self.ui.boot_set_progress(92, "Audio subsystems online")
-                        except Exception:
-                            pass
-                        # finalize
-                        try:
-                            self.ui.boot_set_step_status("Finalize startup", "done")
-                            self.ui.boot_set_progress(100, "Startup complete")
-                        except Exception:
-                            pass
-                finally:
-                    try:
-                        await connect_cm.__aexit__(None, None, None)
-                    except Exception:
-                        pass
-                    
-            except Exception as e:
-                print(f"[BRAHMA EVO] ⚠️ {e}")
-                traceback.print_exc()
-                if _is_gemini_limit_error(e):
-                    self._use_openrouter_first = True
-                self.session = None
-                self._loop = None
-            self.set_speaking(False)
-            self.ui.set_state("LISTENING")
-            print("[BRAHMA EVO] 🔄 Reconnecting in 5s...")
-            await asyncio.sleep(5)
+            await asyncio.sleep(3600)
 
 def main():
     _startup_log("main entered")
@@ -5349,7 +4902,7 @@ def main():
 
             def _ig_handler(thread_id, username, text, is_auto):
                 if is_auto:
-                    return _ig_gemini_reply(username, text)
+                    return _ig_cloud_reply(username, text)
                 else:
                     brahma_evo._ig_reply_mode = True
                     brahma_evo._ig_pending_thread = {
@@ -5405,7 +4958,7 @@ def main():
                         last_clip = curr_clip
                         text = (curr_clip or "").strip()
                         if text and len(text) > 3:
-                            reply = _clipboard_gemini_reply(text[:1000])
+                            reply = _clipboard_cloud_reply(text[:1000])
                             ui.write_log(f"Brahma Evo (Clipboard): {reply}")
                             brahma_evo.speak(reply)
                 except Exception:
