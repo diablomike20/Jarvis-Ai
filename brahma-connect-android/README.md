@@ -4,7 +4,7 @@ Android agent for Jarvis AI Connect.
 
 What this project is:
 - Native Android agent
-- WebSocket client for the existing Brahma Gateway
+- WebSocket client for the existing Jarvis AI Gateway
 - Minimal pairing and reconnect flow
 - First command set only
 
