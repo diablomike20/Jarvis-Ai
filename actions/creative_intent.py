@@ -134,7 +134,7 @@ def handle_creative_text(text: str) -> str:
             })
         tool = plan.get("tool")
         if not isinstance(tool, str) or tool not in known:
-            return "Nem sikerült létező szerkesztőparancsot kiválasztani."
+            return "Az AI nem létező MCP-parancsot választott."
         return creative_studio({
             "app": app,
             "operation": ("inspect" if tool in READ_ONLY_TOOLS[app] else "execute"),
