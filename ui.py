@@ -10363,6 +10363,29 @@ class SettingsHubPage(QWidget):
         lay.addLayout(cards_lay)
         lay.addStretch(2)
 
+class HungarianVoiceImportWorker(QThread):
+    """Convert selected local audio without blocking the GUI or uploading data."""
+
+    completed = pyqtSignal(bool, str)
+
+    def __init__(self, source: str, start_seconds: int, parent=None):
+        super().__init__(parent)
+        self._source = source
+        self._start_seconds = start_seconds
+
+    def run(self):
+        try:
+            from actions.voice_reference import prepare_reference
+            prepare_reference(self._source, start_seconds=self._start_seconds)
+            self.completed.emit(True, "Helyi referencia sikeresen előkészítve (25 s PCM WAV).")
+        except Exception as exc:
+            from actions.voice_reference import ReferencePreparationError
+            if isinstance(exc, ReferencePreparationError):
+                self.completed.emit(False, str(exc))
+            else:
+                self.completed.emit(False, "A hangminta helyi előkészítése sikertelen.")
+
+
 class HungarianVoiceTestWorker(QThread):
     """Run a voice test outside the Qt UI thread; no reference data leaves disk."""
 
@@ -11300,6 +11323,9 @@ class SystemConnectivityPage(QWidget):
         self._hu_voice_status_lbl.setWordWrap(True)
         self._hu_voice_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
         vlay.addWidget(self._hu_voice_status_lbl)
+        self._hu_voice_import_btn = QPushButton("Helyi MP3/WAV hangminta kiválasztása")
+        self._hu_voice_import_btn.clicked.connect(self._import_hu_voice_reference)
+        vlay.addWidget(self._hu_voice_import_btn)
         self._hu_voice_test_btn = QPushButton("Magyar hang kipróbálása")
         self._hu_voice_test_btn.clicked.connect(self._test_hu_voice)
         vlay.addWidget(self._hu_voice_test_btn)
@@ -11324,12 +11350,71 @@ class SystemConnectivityPage(QWidget):
             self._hu_voice_enabled_btn.setChecked(bool(status["enabled"]))
         finally:
             self._hu_voice_enabled_btn.blockSignals(False)
+        import_running = bool(
+            getattr(self, "_hu_voice_import_worker", None)
+            and self._hu_voice_import_worker.isRunning()
+        )
         self._hu_voice_status_lbl.setText(str(status["reason"]))
+        self._hu_voice_enabled_btn.setEnabled(not import_running)
+        self._hu_voice_import_btn.setEnabled(not import_running)
         self._hu_voice_test_btn.setEnabled(
             bool(status["enabled"] and status["can_enable"])
+            and not import_running
             and not (getattr(self, "_hu_voice_worker", None)
                      and self._hu_voice_worker.isRunning())
         )
+
+    def _import_hu_voice_reference(self):
+        """Explicit local-only import; the selected voice must be authorized."""
+        if getattr(self, "_hu_voice_import_worker", None) and self._hu_voice_import_worker.isRunning():
+            return
+        source, _ = QFileDialog.getOpenFileName(
+            self, "Engedélyezett helyi hangminta kiválasztása", "",
+            "Audio fájl (*.mp3 *.wav)"
+        )
+        if not source:
+            return
+        start, ok = QInputDialog.getInt(
+            self, "Referencia-részlet kiválasztása",
+            "Hányadik másodperctől kezdődjön a 25 másodperces részlet? "
+            "(Válassz egyetlen beszélőt tartalmazó, tiszta szakaszt.)",
+            0, 0, 3600, 1
+        )
+        if not ok:
+            return
+        approved = QMessageBox.question(
+            self, "Privát magyar hangreferencia",
+            "Igazolod, hogy rendelkezel a kiválasztott hang megfelelő "
+            "AI beszédszintézisre szóló felhasználási engedélyével?\n\n"
+            "A kiválasztott részlet kizárólag helyben, FFmpeg segítségével "
+            "alakul PCM WAV-fájllá a saját felhasználói könyvtárban. "
+            "A korábbi helyi referencia felülíródik. Nem történik feltöltés.\n\n"
+            "Folytatod?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if approved != QMessageBox.StandardButton.Yes:
+            return
+        self._hu_voice_status_lbl.setText("Helyi referencia előkészítése folyamatban…")
+        worker = HungarianVoiceImportWorker(source, start, self)
+        self._hu_voice_import_worker = worker
+        worker.completed.connect(self._on_hu_voice_import_completed)
+        worker.finished.connect(worker.deleteLater)
+        self._refresh_hu_voice_controls()
+        worker.start()
+
+    def _on_hu_voice_import_completed(self, ok: bool, message: str):
+        self._hu_voice_import_worker = None
+        self._refresh_hu_voice_controls()
+        if not ok:
+            self._hu_voice_status_lbl.setText(message)
+        elif os.environ.get("JARVIS_VOICE_REFERENCE", "").strip():
+            self._hu_voice_status_lbl.setText(
+                "A WAV elkészült, de a JARVIS_VOICE_REFERENCE környezeti "
+                "változó felülírja az alapértelmezett referencia kiválasztását."
+            )
+        else:
+            self._hu_voice_status_lbl.setText(message)
 
     def _on_hu_voice_toggled(self, enabled: bool):
         from actions.jarvis_voice import voice_readiness
