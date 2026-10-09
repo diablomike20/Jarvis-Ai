@@ -1,8 +1,8 @@
-# Brahma Connect
+# Jarvis AI Connect
 
-Brahma Connect is the local multi-device transport layer for Brahma AI.
+Jarvis AI Connect is the local multi-device transport layer for Jarvis AI.
 
-It keeps the AI brain inside the existing Brahma desktop app and adds a
+It keeps the AI brain inside the existing Jarvis AI desktop app and adds a
 gateway that can pair with companion devices on the local network.
 
 ## Included foundation
