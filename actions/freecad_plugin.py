@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -169,7 +170,12 @@ def _validate(operation: str, args: dict) -> dict:
                 raise ValueError("Legfeljebb 100 objektum exportálható.")
             values[key] = [_name(v) for v in value]
         elif kind == "number":
-            values[key] = _number(value, key, positive=(key != "z_angle_degrees"))
+            if key in ("radius1", "radius2"):
+                values[key] = _number(value, key, positive=False)
+                if values[key] < 0:
+                    raise ValueError("A kúp sugara nem lehet negatív.")
+            else:
+                values[key] = _number(value, key, positive=(key != "z_angle_degrees"))
         elif kind == "boolean":
             if not isinstance(value, bool):
                 raise ValueError(f"A(z) {key} logikai érték.")
@@ -270,6 +276,8 @@ class FreeCADPluginAdapter:
                 raise ValueError("Csak már létező .FCStd FreeCAD-dokumentum importálható.")
             if source.stat().st_size > 100 * 1024 * 1024:
                 raise ValueError("Az import fájlja túl nagy (max. 100 MB).")
+            if not zipfile.is_zipfile(source):
+                raise ValueError("A megadott fájl nem érvényes FreeCAD FCStd archívum.")
             if project_file.exists():
                 raise ValueError("Már létezik ilyen nevű JARVIS CAD-projekt.")
             shutil.copy2(source, project_file)
