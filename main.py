@@ -278,7 +278,7 @@ def _speak_daily_briefing(ui=None, speak=None) -> None:
 def _cloud_text_reply(prompt: str) -> str:
     """OpenRouter text response; local fallback is handled by the request router."""
     return openrouter_client.chat(
-        prompt, system="You are Jarvis, a concise and helpful desktop assistant."
+        prompt, system="You are Jarvis, a concise and helpful desktop assistant. Respond in natural Hungarian unless the user asks for another language."
     )
 
 
@@ -3474,7 +3474,7 @@ class BrahmaLive:
                         request_text,
                         system=(
                             "You are Brahma Evo, a concise, helpful desktop assistant. "
-                            "Reply naturally and briefly. Do not mention internal implementation details."
+                            "Reply naturally in Hungarian unless another language is requested. Be concise and do not mention internal implementation details."
                         ),
                     )
                     print("[BRAHMA EVO] 🌐 OpenRouter answered successfully!")
@@ -3504,7 +3504,7 @@ class BrahmaLive:
                         "- You have FULL DIRECT ACCESS and authority over this Windows PC via your tools.\n"
                         "- NEVER state that you are a text-based AI, that you cannot perform automations, or that you lack real-time access.\n"
                         "- Whenever the user requests an action (opening an app, changing volume, setting a reminder, running a protocol, organizing files, searching, etc.), ALWAYS call the corresponding tool.\n"
-                        "- Keep responses concise, direct, and conversational."
+                        "- Keep responses concise, direct, and conversational.\n"\n                        "- Respond in natural Hungarian unless the user explicitly requests another language."
                     )
 
                     messages = [
