@@ -14,15 +14,17 @@ import threading
 from pathlib import Path
 
 from actions.creative_studio import _McpSession, creative_studio
-from core.user_paths import get_user_data_dir
+from actions.source_cli_adapter import CliCommandAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "integrations" / "sources"
 BUILTIN_EDITORS = {"photocraft", "lightcraft", "filmcraft"}
-_ALLOWED_ADAPTERS = {"creative_studio", "mcp_stdio"}
+_ALLOWED_ADAPTERS = {"creative_studio", "mcp_stdio", "cli_commands"}
+_COMMAND_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+_ARGUMENT_TOKEN = re.compile(r"^\{([a-zA-Z][a-zA-Z0-9_]{0,63})\}$")
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 _ENV_PATTERN = re.compile(r"^JARVIS_[A-Z][A-Z0-9_]*_CLI$")
-_sessions: dict[str, tuple[str, _McpSession]] = {}
+_sessions: dict[str, tuple[str, _McpSession | CliCommandAdapter]] = {}
 _lock = threading.RLock()
 
 
@@ -50,6 +52,8 @@ def _read_manifest(path: Path) -> dict:
         raise SourcePluginError(f"Érvénytelen manifest: {path.name}: {exc}") from exc
     if not isinstance(data, dict):
         raise SourcePluginError("A manifestnek JSON-objektumnak kell lennie.")
+    if data.get("schema_version") != 1:
+        raise SourcePluginError("Csak az 1-es manifest-verzió támogatott.")
     plugin_id = data.get("id")
     adapter = data.get("adapter")
     if not isinstance(plugin_id, str) or not _ID_PATTERN.fullmatch(plugin_id):
@@ -60,14 +64,74 @@ def _read_manifest(path: Path) -> dict:
         raise SourcePluginError(f"Nem támogatott adapter: {adapter}")
     if adapter == "creative_studio" and plugin_id not in BUILTIN_EDITORS:
         raise SourcePluginError("A creative_studio adapter csak a három ellenőrzött szerkesztőhöz használható.")
-    if adapter == "mcp_stdio":
+    if adapter in ("mcp_stdio", "cli_commands"):
         variable = data.get("executable_env")
-        arguments = data.get("args", ["mcp"])
         if not isinstance(variable, str) or not _ENV_PATTERN.fullmatch(variable):
-            raise SourcePluginError("Az MCP pluginhoz JARVIS_*_CLI környezeti változó kell.")
+            raise SourcePluginError("A source pluginhoz JARVIS_*_CLI környezeti változó kell.")
+    if adapter == "mcp_stdio":
+        arguments = data.get("args", ["mcp"])
         if (not isinstance(arguments, list) or len(arguments) > 25 or
                 not all(isinstance(a, str) and 0 < len(a) <= 300 for a in arguments)):
-            raise SourcePluginError("Az args mezőnek rövid sztringek listájának kell lennie.")
+            raise SourcePluginError("Az MCP args mezőnek rövid sztringek listájának kell lennie.")
+    if adapter == "cli_commands":
+        commands = data.get("commands")
+        if not isinstance(commands, list) or not 1 <= len(commands) <= 64:
+            raise SourcePluginError("A CLI adapter 1–64 deklarált parancsot igényel.")
+        seen = set()
+        for cmd in commands:
+            if not isinstance(cmd, dict):
+                raise SourcePluginError("Minden parancsnak JSON-objektumnak kell lennie.")
+            name = cmd.get("name")
+            if not isinstance(name, str) or not _COMMAND_PATTERN.fullmatch(name) or name in seen:
+                raise SourcePluginError(f"Ismételt vagy érvénytelen CLI parancsnév: {name!r}")
+            seen.add(name)
+            description = cmd.get("description")
+            if not isinstance(description, str) or not 1 <= len(description) <= 500:
+                raise SourcePluginError(f"{name}: kötelező, rövid parancsleírás.")
+            tokens = cmd.get("args")
+            if (not isinstance(tokens, list) or not 1 <= len(tokens) <= 40 or
+                    not all(isinstance(t, str) and 0 < len(t) <= 1024 and
+                            "\x00" not in t and "\n" not in t for t in tokens)):
+                raise SourcePluginError(f"{name}: érvénytelen argv-sablon.")
+            placeholders = set()
+            for token in tokens:
+                match = _ARGUMENT_TOKEN.fullmatch(token)
+                if match:
+                    placeholders.add(match.group(1))
+                elif "{" in token or "}" in token:
+                    raise SourcePluginError(
+                        f"{name}: helyettesítés csak önálló {{paraméter}} argumentumban lehet."
+                    )
+            schema = cmd.get("parameters")
+            if not isinstance(schema, dict) or schema.get("type") != "object":
+                raise SourcePluginError(f"{name}: a parameters mező JSON object séma legyen.")
+            props = schema.get("properties", {})
+            required = schema.get("required", [])
+            if not isinstance(props, dict) or not isinstance(required, list) or (
+                any(not isinstance(key, str) for key in required)
+            ):
+                raise SourcePluginError(f"{name}: hibás parameter properties/required.")
+            if set(props) != placeholders or set(required) != placeholders or len(set(required)) != len(required):
+                raise SourcePluginError(
+                    f"{name}: minden {{paraméter}} legyen deklarált és kötelező."
+                )
+            for key, spec in props.items():
+                if not isinstance(spec, dict) or spec.get("type") not in (
+                    "string", "integer", "number", "boolean"
+                ):
+                    raise SourcePluginError(f"{name}: nem támogatott paramétertípus: {key}.")
+                if "enum" in spec and (
+                    not isinstance(spec["enum"], list) or len(spec["enum"]) > 100
+                ):
+                    raise SourcePluginError(f"{name}: érvénytelen enum: {key}.")
+            seconds = cmd.get("timeout_seconds", 45)
+            if not isinstance(seconds, int) or isinstance(seconds, bool) or not 1 <= seconds <= 180:
+                raise SourcePluginError(f"{name}: időkorlát 1–180 másodperc lehet.")
+    aliases = data.get("aliases", [])
+    if (not isinstance(aliases, list) or len(aliases) > 16 or
+            not all(isinstance(a, str) and 5 <= len(a.strip()) <= 64 for a in aliases)):
+        raise SourcePluginError("Az aliases mező rövid sztringek listája legyen.")
+
     data["enabled"] = data.get("enabled") is True
     data["name"] = str(data.get("name") or plugin_id)[:80]
     return data
@@ -99,7 +163,7 @@ def _binary_for(manifest: dict) -> str | None:
     return str(path.resolve())
 
 
-def _session(manifest: dict) -> _McpSession:
+def _session(manifest: dict) -> _McpSession | CliCommandAdapter:
     plugin_id = manifest["id"]
     binary = _binary_for(manifest)
     if not binary:
@@ -112,15 +176,21 @@ def _session(manifest: dict) -> _McpSession:
     argv = [binary] + list(manifest.get("args", ["mcp"]))
     with _lock:
         cached = _sessions.get(plugin_id)
-        signature = json.dumps(argv)
+        signature = json.dumps(
+            {"adapter": manifest["adapter"], "argv": argv,
+             "commands": manifest.get("commands")}, sort_keys=True
+        )
         if cached and cached[0] == signature and cached[1].process.poll() is None:
             return cached[1]
         if cached:
             cached[1].close()
         try:
-            session = _McpSession(plugin_id, binary, command=argv)
+            if manifest["adapter"] == "cli_commands":
+                session = CliCommandAdapter(plugin_id, binary, manifest)
+            else:
+                session = _McpSession(plugin_id, binary, command=argv)
         except Exception as exc:
-            raise SourcePluginError(f"Az MCP-szerver nem indult: {exc}") from exc
+            raise SourcePluginError(f"A source adapter nem indult: {exc}") from exc
         _sessions[plugin_id] = (signature, session)
         return session
 
@@ -159,6 +229,7 @@ def source_plugins(parameters: dict | None = None, player=None) -> str:
                 "adapter": m["adapter"], "enabled": m["enabled"],
                 "cli_available": bool(_binary_for(m)),
                 "capabilities": m.get("capabilities", []),
+                "aliases": m.get("aliases", []),
             }
             for key, m in manifests.items()
         }, ensure_ascii=False)
