@@ -24,7 +24,7 @@ jobs:
           python-version: '3.11'
       - name: Syntax validation
         run: |
-          python -m py_compile main.py actions/creative_studio.py actions/creative_intent.py actions/source_plugins.py actions/source_intent.py actions/source_cli_adapter.py actions/freecad_plugin.py integrations/sources/freecad/freecad_worker.py core/local_brain.py core/skill_crucible.py core/skill_forge.py actions/auto_heal_engine.py agent/executor.py
+          python -m py_compile main.py actions/creative_studio.py actions/creative_intent.py actions/source_plugins.py actions/source_intent.py actions/source_cli_adapter.py actions/freecad_plugin.py integrations/sources/freecad/freecad_worker.py core/local_brain.py core/skill_crucible.py core/skill_forge.py core/dynamic_registry.py actions/auto_heal_engine.py agent/executor.py
       - name: Dependencies for bridge tests
         run: |
           python -m pip install -q pytest requests numpy
