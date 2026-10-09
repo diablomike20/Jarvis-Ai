@@ -19,6 +19,7 @@ import re
 import shutil
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -428,20 +429,40 @@ class DynamicToolRegistry:
 
     @classmethod
     def delete_skill(cls, name: str) -> bool:
-        """Permanently removes a synthetic skill."""
+        """Revoke ONLY a generated skill; archive it instead of deleting.
+
+        Native file-based skills use 'features/' as skill_dir. The old code
+        called rmtree(skill_dir), risking deletion of the whole features tree.
+        A generated skill is now always an individually identified package.
+        """
         skill = cls.get_skill(name)
-        if not skill:
+        if not skill or skill.manifest.get("author") not in (
+            "JARVIS AI Skill Forge (reviewed)",
+            "Project Ultron Autonomous Self-Evolution Engine",
+        ):
+            return False
+        root = FEATURES_DIR.resolve()
+        directory = skill.skill_dir
+        # Protect the native root, symlinks, and all non-owning aliases.
+        if (not directory.is_dir() or directory.is_symlink() or
+                directory.resolve().parent != root or
+                directory.resolve() == root or
+                directory.name != skill.name or name != skill.name or
+                not (directory / "manifest.json").is_file() or
+                not (directory / "skill.py").is_file()):
+            return False
+        try:
+            # Preserve a dated/unique copy for undo and forensic review.
+            archive = get_user_data_dir() / "skill_backups"
+            archive.mkdir(parents=True, exist_ok=True)
+            destination = archive / (skill.name + "_" + uuid.uuid4().hex)
+            shutil.move(str(directory), str(destination))
+            cls.initialize()
+            return True
+        except Exception as exc:
+            logger.error(f"[Registry] Failed to archive generated skill '{name}': {exc}")
             return False
 
-        try:
-            if skill.skill_dir.exists():
-                shutil.rmtree(skill.skill_dir)
-            if name in cls._skills:
-                del cls._skills[name]
-            return True
-        except Exception as e:
-            logger.error(f"[Registry] Failed to delete skill '{name}': {e}")
-            return False
 
     @classmethod
     def execute_sync(cls, name: str, args: Dict[str, Any]) -> Any:
