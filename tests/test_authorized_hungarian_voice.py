@@ -189,3 +189,20 @@ def test_stop_is_wired_to_xtts_and_edge_cleanup(reference, monkeypatch):
     scope["_cleanup_current_audio"] = lambda: hits.append("edge-stop")
     scope["stop_native_speech"]()
     assert hits == ["xtts-stop", "edge-stop"]
+
+def test_queue_rechecks_user_opt_in_before_synthesis(reference, monkeypatch):
+    """Disabling XTTS while waiting for a lock must suppress queued speech."""
+    from memory import config_manager
+    calls = {"loads": 0}
+
+    def settings():
+        calls["loads"] += 1
+        return {"jarvis_voice_enabled": calls["loads"] == 1}
+
+    monkeypatch.setattr(config_manager, "load_settings", settings)
+    fake_winsound(monkeypatch)
+    def forbidden_model():
+        raise AssertionError("Cancelled voice must never load a model")
+    monkeypatch.setattr(jarvis_voice, "_load_model", forbidden_model)
+    assert jarvis_voice.speak_authorized_hungarian("A felhasználó kikapcsolta a hangot.") is False
+    assert calls["loads"] >= 2
