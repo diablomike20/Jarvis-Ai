@@ -359,8 +359,13 @@ def _speak_sapi_male(text: str) -> None:
         pythoncom.CoInitialize()
         v = win32com.client.Dispatch("SAPI.SpVoice")
         v.Volume = 100
+        try:
+            v.Rate = -1  # Calm, measured delivery
+        except Exception:
+            pass
 
-        # Prioritize Windows Speech OneCore male voices (e.g. George, David, Mark)
+        # Prefer a locally installed Hungarian male voice (e.g. Szabolcs).
+        # Windows does not guarantee a Hungarian SAPI voice is installed.
         selected = False
         try:
             category = win32com.client.Dispatch("SAPI.SpObjectTokenCategory")
@@ -369,10 +374,18 @@ def _speak_sapi_male(text: str) -> None:
             for i in range(tokens.Count):
                 token = tokens.Item(i)
                 desc = token.GetDescription().lower()
-                if any(m in desc for m in ("george", "david", "mark", "male", "guy")):
+                if any(m in desc for m in ("szabolcs", "tamas", "hungarian", "hu-hu")):
                     v.Voice = token
                     selected = True
                     break
+            if not selected:
+                for i in range(tokens.Count):
+                    token = tokens.Item(i)
+                    desc = token.GetDescription().lower()
+                    if any(m in desc for m in ("george", "david", "mark", "male", "guy")):
+                        v.Voice = token
+                        selected = True
+                        break
         except Exception:
             pass
 
@@ -382,7 +395,7 @@ def _speak_sapi_male(text: str) -> None:
             for i in range(voices.Count):
                 token = voices.Item(i)
                 desc = token.GetDescription().lower()
-                if any(m in desc for m in ("david", "george", "mark", "male")):
+                if any(m in desc for m in ("szabolcs", "tamas", "hungarian", "hu-hu", "david", "george", "mark", "male")):
                     v.Voice = token
                     selected = True
                     break
@@ -427,7 +440,15 @@ def _speak_edge_native(text: str, force_edge: bool = False) -> None:
 
         audio_path = os.path.join(tempfile.gettempdir(), f"brahma_edge_tts_{uuid.uuid4().hex}.mp3")
         try:
-            communicator = edge_tts.Communicate(text, voice="en-US-GuyNeural")
+            from actions.voice_profile import edge_voice_profile
+            profile = edge_voice_profile()
+            communicator = edge_tts.Communicate(
+                text,
+                voice=profile.voice,
+                rate=profile.rate,
+                pitch=profile.pitch,
+                volume=profile.volume,
+            )
             communicator.save_sync(audio_path)
         except Exception as exc:
             print(f"[AttentionMonitor] Edge TTS generation failed: {exc}. Falling back to offline male voice.")
