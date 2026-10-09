@@ -156,6 +156,10 @@ def speak_authorized_hungarian(text: str) -> bool:
         return False
 
     with _speech_lock:
+        # A queued utterance must not start after the user disables XTTS
+        # while another utterance holds the speech lock.
+        if not is_configured():
+            return False
         cancel = threading.Event()
         with _state_lock:
             _active_cancel = cancel
