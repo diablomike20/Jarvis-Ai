@@ -8,7 +8,9 @@ and hot-pluggable Python skills for Brahma AI.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import uuid
 import logging
 import os
 import re
@@ -39,153 +41,167 @@ class SkillForge:
         context_hints: str = "",
         max_repair_attempts: int = 2,
     ) -> Dict[str, Any]:
-        """
-        Synthesizes a brand new skill from natural language, verifies it in the
-        Crucible sandbox, auto-resolves pip packages, and hot-registers it.
-        """
-        logger.info(f"[Forge] Initiating skill synthesis for goal: '{goal}'")
+        """Generate a REVIEWABLE draft. No new code runs until the human approves.
 
-        # Normalize skill name if provided
+        Draft code is written only to the user-specific review folder, NOT
+        features/. No subprocess tests, pip commands or module imports occur
+        before HUD consent. A missing HUD means the draft stays unactivated.
+        """
+        goal = (goal or "").strip()
+        if not goal or len(goal) > 2000:
+            return {"success": False, "message": "Adj meg rövid, konkrét funkcióleírást."}
         name_hint = re.sub(r"[^a-zA-Z0-9_]", "_", (skill_name or "").lower()).strip("_")
-
-        # 1. Synthesize initial specification
         synthesis = cls._call_llm_synthesizer(goal, name_hint, context_hints)
         if not synthesis.get("success"):
-            return {
-                "success": False,
-                "message": f"Skill synthesis generation failed: {synthesis.get('error')}",
-            }
+            return {"success": False,
+                    "message": f"A skillgenerálás nem sikerült: {synthesis.get('error')}"}
 
-        manifest = synthesis["manifest"]
-        code = synthesis["code"]
-        test_cases = synthesis.get("test_cases", [{"input": {}}])
-        actual_name = manifest.get("name", name_hint or "custom_skill")
-
-        # 2. Iterative Verification & Self-Repair Loop
-        for attempt in range(max_repair_attempts + 1):
-            logger.info(f"[Forge] Crucible verification attempt {attempt + 1}/{max_repair_attempts + 1} for '{actual_name}'")
-
-            # Stage A: AST Validation
-            ast_ok, ast_err = SkillCrucible.validate_ast(code)
-            if not ast_ok:
-                if attempt < max_repair_attempts:
-                    logger.warning(f"[Forge] AST check failed ({ast_err}). Requesting repair from LLM...")
-                    repair = cls._repair_code(code, ast_err, goal)
-                    if repair.get("success"):
-                        code = repair["code"]
-                        continue
-                return {"success": False, "message": f"Crucible AST rejected skill: {ast_err}"}
-
-            # Stage B: Dependency Auto-Resolver
-            deps = SkillCrucible.extract_dependencies(code)
-            deps_ok, deps_msg = SkillCrucible.resolve_dependencies(deps)
-            if not deps_ok:
-                return {"success": False, "message": f"Dependency resolution failed: {deps_msg}"}
-
-            # Stage C: Sandboxed Execution Tests
-            test_ok, test_msg, test_telemetry = SkillCrucible.run_sandbox_test(code, test_cases)
-            if not test_ok:
-                if attempt < max_repair_attempts:
-                    logger.warning(f"[Forge] Sandbox tests failed ({test_msg}). Requesting repair from LLM...")
-                    repair = cls._repair_code(code, test_msg, goal)
-                    if repair.get("success"):
-                        code = repair["code"]
-                        continue
-                return {"success": False, "message": f"Crucible Sandbox tests failed: {test_msg}", "telemetry": test_telemetry}
-
-            # All stages passed!
-            break
-
-        # 3. Commit as a Native Codebase Feature in features/ (Autonomous Self-Evolution)
-        features_dir = DynamicToolRegistry.get_skills_directory()
-        features_dir.mkdir(parents=True, exist_ok=True)
-
-        # Prepare triggers & aliases
-        triggers = list(manifest.get("triggers", []))
-        if goal and goal.strip() not in triggers:
-            triggers.append(goal.strip())
-
-        clean_goal = re.sub(
-            r"^(?:please\s+|can\s+you\s+|use\s+(?:the\s+)?(?:skill|feature)\s+to\s+|run\s+(?:the\s+)?(?:skill|feature)\s+to\s+|test\s+(?:the\s+)?(?:skill|feature)\s+to\s+)",
-            "",
-            goal.lower().strip()
-        )
-        if clean_goal and clean_goal not in triggers:
-            triggers.append(clean_goal)
-
-        name_words_trigger = actual_name.replace("_", " ")
-        if name_words_trigger not in triggers:
-            triggers.append(name_words_trigger)
-
-        aliases = list(manifest.get("aliases", []))
-        clean_alias = actual_name.replace("_", "")
-        if clean_alias not in aliases:
-            aliases.append(clean_alias)
-
-        manifest["name"] = actual_name
-        manifest["triggers"] = list(dict.fromkeys(triggers))
-        manifest["aliases"] = list(dict.fromkeys(aliases))
-        manifest["created_at"] = time.time()
-        manifest["version"] = "1.0.0"
-        manifest["author"] = "Project Ultron Autonomous Self-Evolution Engine"
-        manifest["active"] = True
-
-        # Build clean native feature code with embedded FEATURE_METADATA
-        feature_code = code
-        if "FEATURE_METADATA" not in feature_code:
-            meta_str = repr(manifest)
-            header = (
-                f'"""\n'
-                f'Feature: {actual_name}\n'
-                f'Description: {manifest.get("description", "")}\n'
-                f'Autonomous Evolutionary Capability synthesized by Brahma AI.\n'
-                f'"""\n\n'
-                f'FEATURE_METADATA = {meta_str}\n\n'
-            )
-            feature_code = header + feature_code
-
-        # Primary native module: features/{actual_name}.py
-        feature_py_file = features_dir / f"{actual_name}.py"
+        raw_manifest = synthesis.get("manifest")
+        code = synthesis.get("code")
+        cases = synthesis.get("test_cases", [{"input": {}}])
+        if not isinstance(raw_manifest, dict) or not isinstance(code, str):
+            return {"success": False, "message": "Érvénytelen generált skillcsomag."}
+        manifest = dict(raw_manifest)
+        name = manifest.get("name") or name_hint
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]{1,63}", name):
+            return {"success": False, "message": "Érvénytelen vagy nem biztonságos skillnév."}
+        if len(code.encode("utf-8")) > 100_000:
+            return {"success": False, "message": "A generált kód túl nagy."}
+        if (not isinstance(cases, list) or not 1 <= len(cases) <= 20 or
+                not all(isinstance(t, dict) and isinstance(t.get("input", {}), dict)
+                        for t in cases)):
+            return {"success": False, "message": "Érvénytelen generált tesztesetek."}
         try:
-            with open(feature_py_file, "w", encoding="utf-8") as f:
-                f.write(feature_code)
+            if len(json.dumps(cases, ensure_ascii=False)) > 20000:
+                raise ValueError("Túl nagy tesztadatok.")
+        except (TypeError, ValueError) as exc:
+            return {"success": False, "message": f"Érvénytelen tesztadatok: {exc}"}
 
-            # Update features/__init__.py for self-evolving codebase integration
-            init_file = features_dir / "__init__.py"
+        # Repair malformed source *without running it*. The exact final
+        # reviewed source is hashed and cannot be replaced after approval.
+        for attempt in range(max(0, min(max_repair_attempts, 2)) + 1):
+            valid, reason = SkillCrucible.validate_ast(code)
+            if valid:
+                break
+            if attempt >= max(0, min(max_repair_attempts, 2)):
+                return {"success": False, "message": f"Szintaktikailag hibás skill: {reason}"}
+            repair = cls._repair_code(code, reason, goal)
+            if not repair.get("success") or not isinstance(repair.get("code"), str):
+                return {"success": False, "message": f"Javítás nem sikerült: {reason}"}
+            code = repair["code"]
+
+        manifest["name"] = name
+        manifest["active"] = True
+        manifest["version"] = "1.0.0"
+        manifest["created_at"] = time.time()
+        manifest["author"] = "JARVIS AI Skill Forge (reviewed)"
+        manifest["description"] = str(manifest.get("description") or goal)[:500]
+        aliases = manifest.get("aliases", [])
+        triggers = manifest.get("triggers", [])
+        if (not isinstance(aliases, list) or not isinstance(triggers, list) or
+                any(not isinstance(x, str) for x in aliases + triggers)):
+            return {"success": False, "message": "Érvénytelen trigger/alias metaadat."}
+        manifest["aliases"] = list(dict.fromkeys(aliases[:16] + [name.replace("_", "")]))
+        manifest["triggers"] = list(dict.fromkeys(triggers[:16] + [goal, name.replace("_", " ")]))
+        manifest["parameters"] = manifest.get("parameters") or {"type": "OBJECT", "properties": {}}
+        # Do not modify features/__init__.py or overwrite an existing skill.
+        dest = DynamicToolRegistry.get_skills_directory() / f"{name}.py"
+        if dest.exists() or (dest.parent / name).exists():
+            return {"success": False, "message": f"A(z) {name} skill már létezik. Nem írom felül."}
+
+        full_code = "FEATURE_METADATA = " + repr(manifest) + "\n\n" + code
+        valid, reason = SkillCrucible.validate_ast(full_code)
+        if not valid:
+            return {"success": False, "message": f"Hibás generált metaadat/kód: {reason}"}
+        digest = hashlib.sha256(full_code.encode("utf-8")).hexdigest()
+        review_id = uuid.uuid4().hex
+        review_dir = get_user_data_dir() / "skill_reviews" / review_id
+        review_dir.mkdir(parents=True, exist_ok=False)
+        review_path = review_dir / "candidate.py"
+        review_path.write_text(full_code, encoding="utf-8")
+        (review_dir / "proposal.json").write_text(
+            json.dumps({"name": name, "manifest": manifest, "test_cases": cases,
+                        "digest": digest, "goal": goal}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        from core.confirm import request
+        detail = (
+            f"Új AI-generált Python-kód, amely a saját felhasználói jogoddal "
+            f"futhat. Modul: {name}. Kód: {review_path}. "
+            f"SHA256: {digest[:16]}. Előbb ellenőrizd a teljes fájlt! "
+            "Jóváhagyáskor függőségellenőrzés és tesztfuttatás következik; "
+            "ez NEM teljes operációs rendszeres sandbox. "
+            "Csak sikeres tesztek után aktiválódik. Elutasításkor nincs futtatás."
+        )
+        approval = request(
+            "forge-" + review_id, "JARVIS új skill jóváhagyása",
+            detail, lambda: cls.approve_draft(review_dir),
+        )
+        return {
+            "success": True, "pending": True, "name": name,
+            "description": manifest["description"],
+            "review_path": str(review_path), "digest": digest,
+            "message": approval,
+        }
+
+    @classmethod
+    def approve_draft(cls, review_dir: Path) -> str:
+        """Run ONLY the approved draft, then activate without overwriting."""
+        try:
+            path = Path(review_dir)
+            proposal = json.loads((path / "proposal.json").read_text(encoding="utf-8"))
+            code = (path / "candidate.py").read_text(encoding="utf-8")
+            if hashlib.sha256(code.encode("utf-8")).hexdigest() != proposal["digest"]:
+                return "Elutasítva: a jóváhagyás óta megváltozott a skillkód."
+            name = proposal["name"]
+            if not re.fullmatch(r"[a-z][a-z0-9_]{1,63}", name):
+                return "Elutasítva: érvénytelen skillnév."
+            target_dir = DynamicToolRegistry.get_skills_directory()
+            target = target_dir / (name + ".py")
+            package = target_dir / name
+            if target.exists() or package.exists():
+                return "Elutasítva: a skillnév már használatban van."
+            valid, err = SkillCrucible.validate_ast(code)
+            if not valid:
+                return f"Elutasítva: {err}"
+            dependencies = SkillCrucible.extract_dependencies(code)
+            good, msg = SkillCrucible.resolve_dependencies(dependencies)
+            if not good:
+                return f"A szükséges függőségek hiányoznak. Nem telepítettem őket: {msg}"
+            good, msg, _telemetry = SkillCrucible.run_sandbox_test(
+                code, proposal["test_cases"],
+            )
+            if not good:
+                return f"A tesztek nem sikerültek, a funkció inaktív maradt: {msg}"
+            # Ensure the inspected bits did not change during the review/test.
+            if hashlib.sha256((path / "candidate.py").read_bytes()).hexdigest() != proposal["digest"]:
+                return "Elutasítva: a skillkód a teszt közben megváltozott."
+            # Only now does it become part of the runnable registry.
+            package.mkdir(parents=True, exist_ok=False)
             try:
-                init_content = init_file.read_text(encoding="utf-8") if init_file.exists() else ""
-                import_stmt = f"from . import {actual_name}\n"
-                if import_stmt not in init_content:
-                    with open(init_file, "a", encoding="utf-8") as f_init:
-                        f_init.write(import_stmt)
-            except Exception as e_init:
-                logger.warning(f"[Forge] Could not update features/__init__.py: {e_init}")
-
-            # Also maintain feature package directory for telemetry and test cases
-            target_dir = features_dir / actual_name
-            target_dir.mkdir(parents=True, exist_ok=True)
-            with open(target_dir / "manifest.json", "w", encoding="utf-8") as f:
-                json.dump(manifest, f, indent=4)
-            with open(target_dir / "skill.py", "w", encoding="utf-8") as f:
-                f.write(feature_code)
-            with open(target_dir / "test_cases.json", "w", encoding="utf-8") as f:
-                json.dump(test_cases, f, indent=4)
-
-            # 4. Hot-Load into Dynamic Registry
-            DynamicToolRegistry.initialize()
-            if not DynamicToolRegistry.has_tool(actual_name):
-                raise RuntimeError(f"Generated feature '{actual_name}' was not registered.")
-
-            return {
-                "success": True,
-                "name": actual_name,
-                "description": manifest.get("description", ""),
-                "skill_path": str(feature_py_file),
-                "message": f"Successfully forged and activated native feature '{actual_name}'! Verified via Crucible sandbox.",
-                "manifest": manifest,
-            }
-        except Exception as e:
-            return {"success": False, "message": f"Failed saving synthesized feature: {e}"}
+                (package / "manifest.json").write_text(
+                    json.dumps(proposal["manifest"], ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                (package / "skill.py").write_text(code, encoding="utf-8")
+                (package / "test_cases.json").write_text(
+                    json.dumps(proposal["test_cases"], ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                # Avoid duplicate .py and package entries in the registry.
+                DynamicToolRegistry.initialize()
+                if not DynamicToolRegistry.has_tool(name):
+                    raise RuntimeError("Az új skill regisztrációja nem sikerült.")
+            except Exception:
+                import shutil
+                shutil.rmtree(package, ignore_errors=True)
+                DynamicToolRegistry.initialize()
+                raise
+            return f"A(z) {name} skill tesztelve és aktiválva. A kód külön új parancsként használható."
+        except Exception as exc:
+            logger.exception("Approved skill activation failed")
+            return f"Skill aktiválási hiba: {exc}"
 
     @classmethod
     def _parse_json_response(cls, text: str) -> Dict[str, Any]:
@@ -241,7 +257,7 @@ Skill Architecture Guidelines:
    - In `execute(**kwargs)`, ALWAYS assign safe fallback defaults to all expected parameters (e.g. `query = kwargs.get('query') or kwargs.get('search') or 'headphones'`).
    - If called with empty kwargs `{}` (such as during sandbox verification), the skill MUST execute cleanly without throwing KeyError or TypeError.
 4. Resilient Network & Safe SSL Handling:
-   - When external live data or web downloads are needed, prefer `requests` with `timeout=8, verify=False`, OR if using `urllib`, ALWAYS bypass Windows SSL verification via `import ssl; ctx = ssl._create_unverified_context()` because Python on Windows frequently throws `[SSL: CERTIFICATE_VERIFY_FAILED]`.
+   - When external live data or web downloads are needed, use HTTPS with certificate verification enabled and a short timeout. Never disable SSL certificate verification.
    - NEVER require or assume environment API keys (e.g. `GIPHY_API_KEY`, `OPENAI_API_KEY`). Skills must be 100% self-contained and run out of the box using public open APIs (such as Tenor public key `LIVDSRZULELA` or open REST) or local Python logic.
    - If any network call fails or times out, ALWAYS catch generic `Exception` and supply a working fallback so `execute()` NEVER returns an `{'error': ...}` dictionary.
    - Do NOT use heavy scrapers (avoid selenium/playwright).
@@ -329,7 +345,7 @@ Broken Code:
 Critical Repair Instructions:
 1. Ensure `def execute(**kwargs)` handles empty or missing kwargs with safe defaults.
 2. If using `matplotlib`, ensure `import matplotlib; matplotlib.use('Agg')` is placed before `pyplot`.
-3. If making HTTP requests, use `requests` with `timeout=8, verify=False` or `urllib` with `ssl._create_unverified_context()`. NEVER assume custom library exceptions or unset API keys (like GIPHY_API_KEY).
+3. If making HTTP requests, use HTTPS with certificate verification enabled and short timeouts. NEVER assume custom library exceptions or unset API keys (like GIPHY_API_KEY).
 4. If downloading an image or media fails or has SSL errors, NEVER just return an error dictionary. Generate the image natively using PIL (Pillow) or matplotlib and save to `BrahmaAI/deliverables/<name>.png`.
 5. Return a clean deliverable dictionary with `'image_path'`, `'title'`, `'summary'` if visual, or clean structured output.
 6. The test runner checks that the returned value does NOT contain an `'error'` key. Do not return `{{'error': '...'}}`. If an error occurs, provide a graceful fallback result.
