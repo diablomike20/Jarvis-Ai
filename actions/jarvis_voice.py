@@ -42,6 +42,10 @@ def is_configured() -> bool:
         return True
 
 
+def _is_windows() -> bool:
+    return os.name == "nt"
+
+
 @lru_cache(maxsize=1)
 def _load_model():
     """Load heavy optional packages only when custom speech is actually requested."""
@@ -60,7 +64,7 @@ def speak_authorized_hungarian(text: str) -> bool:
     This feature does not download or embed any actor's voice recordings.
     """
     text = (text or "").strip()
-    if not text or not is_configured() or os.name != "nt":
+    if not text or not is_configured() or not _is_windows():
         return False
 
     # Serialize generation and playback, avoiding concurrent access to XTTS.
