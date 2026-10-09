@@ -18,8 +18,8 @@ jobs:
           python-version: '3.11'
       - name: Compile integrated voice routing
         run: |
-          python -m py_compile actions/jarvis_voice.py actions/attention_monitor.py main.py
+          python -m py_compile actions/jarvis_voice.py actions/attention_monitor.py main.py ui.py
       - name: Install test runner only (no XTTS model or voice data)
         run: python -m pip install -q pytest
       - name: Run synthetic WAV and routing regression tests
-        run: python -m pytest -q tests/test_authorized_hungarian_voice.py
+        run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py
