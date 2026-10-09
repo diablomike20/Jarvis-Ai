@@ -3463,7 +3463,7 @@ class BrahmaLive:
             is_cloud_openrouter = configured_provider == "OpenRouter"
 
             # 2. If user explicitly selected OpenRouter, run OpenRouter FIRST
-            elif is_cloud_openrouter and not is_offline_mode:
+            if is_cloud_openrouter and not is_offline_mode:
                 try:
                     self.ui.update_task_workspace(
                         status="Thinking (OpenRouter)",
@@ -3663,7 +3663,7 @@ class BrahmaLive:
         if not text:
             return
 
-        if True:
+        if text:
             # Native speech engine, independent of any cloud AI provider.
             def _speak_thread():
                 try:
