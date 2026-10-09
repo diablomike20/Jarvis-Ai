@@ -123,6 +123,17 @@ python -m pip install -r requirements-voice.txt
 
 [Teljes magyar Gemini-csere útmutató](docs/GEMINI_MIGRATION_HU.md).
 
+## JARVIS önfejlesztés — felhasználói jóváhagyással
+
+A Skill Forge továbbra is készít új Python-képességeket, de most
+**először tervezetet ment**, és csak a JARVIS HUD jóváhagyása után
+futtatja a teszteket és aktiválja a kész modult. Az Auto-Heal saját
+forráskódjavításai is előzetes jóváhagyást igényelnek. Többé nincs
+automatikus Python-csomagtelepítés; a jóváhagyott subprocess-tesztek
+még nem jelentenek teljes OS-szintű sandboxot.
+
+[Önfejlesztés és biztonság – magyar leírás](docs/SELF_EVOLUTION_HU.md)
+
 ## Tetszőleges source projekt moduláris beépítése
 
 A **JARVIS Source Plugin Framework** bármely ellenőrzött GitHub-source
