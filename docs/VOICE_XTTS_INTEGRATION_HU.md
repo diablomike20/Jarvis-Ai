@@ -85,3 +85,31 @@ kiejtés, hangminőség, leállítás, két gyors egymás utáni válasz,
 mikrofon/STT regresszió, offline fallback és törölt ideiglenes WAV.
 
 **A jelen ág önmagában nem bizonyítja a célgépes használhatóságot.**
+
+
+## JARVIS AI grafikus beállítások (aktív alkalmazáskód)
+
+A magyar hang immár a valódi asztali JARVIS AI-ban kapcsolható:
+
+1. Nyisd meg a **Settings → System & Connectivity → Audio Routing & Hardware Controls** részt.
+2. Keresd meg: **JARVIS magyar hang (helyi XTTS-v2)**.
+3. A **Magyar XTTS hang engedélyezése** kapcsoló ellenőrzi
+   a WAV-referenciát, a `coqui-tts` és `torch` helyi függőségeket,
+   és külön rákérdez a hangfelhasználási jogosultságra.
+4. Az engedélyezés csak jóváhagyás után menti
+   `jarvis_voice_enabled=true` értéket a felhasználói beállításba.
+5. A **Magyar hang kipróbálása** gomb egy rövid magyar mondatot generál,
+   külön szálon; így az asztali felület használható marad.
+   Ez a teszt indíthatja az XTTS modell első letöltését, és a modell
+   licencfeltételeinek elfogadása is szükséges lehet.
+6. A kapcsoló kikapcsolásakor az XTTS leáll, az Edge/SAPI tartalék
+   beszédútvonal továbbra is használható.
+
+A képernyő **nem jeleníti meg és nem naplózza** a privát
+referencia-WAV elérési útvonalát. Nem tölti fel a WAV-ot GitHubra,
+és nem használja CI-ban. A `voice_readiness()` könnyű ellenőrzés
+nem tölti be és nem tölti le a hangmodellt.
+
+**Nem igazolt még**: Windows célgépes tényleges GUI-interakció,
+valós XTTS hangkimenet és az első modellletöltés. Ezt a tesztet
+csak a saját Windows-rendszereden lehet lezárni.
