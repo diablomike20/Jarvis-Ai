@@ -53,8 +53,14 @@ def execute_source_text(text: str) -> str:
         from actions.creative_intent import handle_creative_text
         return handle_creative_text(text)
 
-    session = _session(manifest)
-    tools = session.list_tools()
+    try:
+        session = _session(manifest)
+        tools = session.list_tools()
+    except (OSError, RuntimeError, ValueError) as error:
+        return (
+            f"A(z) {manifest['name']} motor nem érhető el: {error}. "
+            "Az integráció regisztrálva van, de a szükséges helyi program még hiányozhat."
+        )
     if not tools:
         return "A modul nem hirdetett MCP-eszközöket."
     # Prefer concise names and bounded descriptions, never feed huge schemas
