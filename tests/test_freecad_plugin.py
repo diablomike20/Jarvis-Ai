@@ -218,3 +218,44 @@ def test_freecad_worker_uses_real_freecad_api_without_evaluating_model_code():
     assert "PartDesign::Pad" in script
     assert "Part.export(" in script
     assert "eval(" not in script and "exec(" not in script
+
+
+def test_geometry_import_is_copied_to_private_workspace(tmp_path, monkeypatch):
+    adapter = _installed_adapter(tmp_path, monkeypatch)
+    project = cad._workspace() / "assembly.FCStd"
+    project.write_bytes(b"existing FreeCAD model fixture")
+    source = tmp_path / "engine_part.step"
+    source.write_text("ISO-10303-21;\nEND-ISO-10303-21;", encoding="utf-8")
+    jobs = []
+    monkeypatch.setattr(adapter, "_invoke",
+                        lambda job, root: jobs.append(job) or
+                        {"isError": False, "structuredContent": {"ok": True}})
+    output = adapter.call_tool("import_geometry", {
+        "project": "assembly", "source_path": str(source),
+    })
+    assert output["isError"] is False
+    staged = Path(jobs[0]["input_file"])
+    assert staged.exists()
+    assert staged.is_relative_to(cad._workspace() / "imports")
+    assert staged.suffix == ".step"
+    assert jobs[0]["operation"] == "import_geometry"
+
+
+def test_geometry_import_rejects_unknown_extension(tmp_path, monkeypatch):
+    adapter = _installed_adapter(tmp_path, monkeypatch)
+    (cad._workspace() / "assembly.FCStd").write_bytes(b"fixture")
+    source = tmp_path / "untrusted.py"
+    source.write_text("print('hello')", encoding="utf-8")
+    with pytest.raises(ValueError, match="Nem támogatott"):
+        adapter.call_tool("import_geometry", {
+            "project": "assembly", "source_path": str(source),
+        })
+
+
+def test_cli_missing_is_reported_for_hungarian_voice_request(monkeypatch, tmp_path):
+    monkeypatch.setenv("JARVIS_FREECAD_CMD", str(tmp_path / "does-not-exist.exe"))
+    result = source_intent.execute_source_text(
+        "FreeCAD, készíts 3D alkatrészt!"
+    )
+    assert "motor nem érhető el" in result
+    assert "FreeCAD" in result
