@@ -207,7 +207,7 @@ class DeviceCommandHandler(private val context: Context) {
         }
         val service = com.brahma.connect.accessibility.BrahmaAccessibilityService.instance
         if (service == null) {
-            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Brahma Accessibility Service is not enabled.")
+            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Jarvis AI Accessibility Service is not enabled.")
         }
         val success = service.unlockPhone(pin)
         return if (success) {
@@ -304,7 +304,7 @@ class DeviceCommandHandler(private val context: Context) {
     private fun uiDump(): CommandResult {
         val service = com.brahma.connect.accessibility.BrahmaAccessibilityService.instance
         if (service == null) {
-            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Brahma Accessibility Service is not enabled.")
+            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Jarvis AI Accessibility Service is not enabled.")
         }
         val result = service.dumpUiTree()
         return if (result.containsKey("error")) {
@@ -317,7 +317,7 @@ class DeviceCommandHandler(private val context: Context) {
     private fun uiTap(parameters: Map<String, Any?>): CommandResult {
         val service = com.brahma.connect.accessibility.BrahmaAccessibilityService.instance
         if (service == null) {
-            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Brahma Accessibility Service is not enabled.")
+            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Jarvis AI Accessibility Service is not enabled.")
         }
         val x = (parameters["x"] as? Number)?.toInt()
         val y = (parameters["y"] as? Number)?.toInt()
@@ -331,7 +331,7 @@ class DeviceCommandHandler(private val context: Context) {
     private fun uiSwipe(parameters: Map<String, Any?>): CommandResult {
         val service = com.brahma.connect.accessibility.BrahmaAccessibilityService.instance
         if (service == null) {
-            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Brahma Accessibility Service is not enabled.")
+            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Jarvis AI Accessibility Service is not enabled.")
         }
         val x1 = (parameters["x1"] as? Number)?.toInt()
         val y1 = (parameters["y1"] as? Number)?.toInt()
@@ -348,7 +348,7 @@ class DeviceCommandHandler(private val context: Context) {
     private fun uiType(parameters: Map<String, Any?>): CommandResult {
         val service = com.brahma.connect.accessibility.BrahmaAccessibilityService.instance
         if (service == null) {
-            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Brahma Accessibility Service is not enabled.")
+            return CommandResult(false, errorCode = "ACCESSIBILITY_DISABLED", error = "Jarvis AI Accessibility Service is not enabled.")
         }
         val text = parameters["text"]?.toString()
         if (text.isNullOrEmpty()) {
