@@ -4,8 +4,8 @@ Part of Project Ultron for Brahma AI.
 
 Performs:
 1. Static AST Safety Analysis (blocks destructive OS actions).
-2. Dependency Auto-Resolution (installs required packages in .venv).
-3. Sandboxed Subprocess Test Execution (validates against test cases with timeouts).
+2. Dependency presence checks (never silently installs packages).
+3. Subprocess test execution AFTER explicit human consent (not an OS sandbox).
 """
 
 from __future__ import annotations
@@ -155,52 +155,32 @@ class SkillCrucible:
 
     @classmethod
     def resolve_dependencies(cls, dependencies: List[str]) -> Tuple[bool, str]:
-        """Installs missing dependencies into the Python environment."""
+        """Check dependencies only. Never install or uninstall packages autonomously."""
         if not dependencies:
-            return True, "No external dependencies required."
-
+            return True, "Nincs további csomagfüggőség."
         py_exe = _get_python_executable()
-        installed_any = []
-
+        missing = []
         for dep in dependencies:
-            pip_name = IMPORT_TO_PIP.get(dep, dep)
-            # Check if importable and healthy
-            is_healthy = False
-            try:
-                check_script = f"import {dep}"
-                if dep == "speedtest":
-                    check_script = "import speedtest; assert hasattr(speedtest, 'Speedtest')"
-                elif dep == "PIL":
-                    check_script = "import PIL.Image"
-                elif dep == "cv2":
-                    check_script = "import cv2; assert hasattr(cv2, 'imread')"
-                check_cmd = [py_exe, "-c", check_script]
-                proc = subprocess.run(check_cmd, capture_output=True, timeout=5)
-                if proc.returncode == 0:
-                    is_healthy = True
-            except Exception:
-                is_healthy = False
-
-            if is_healthy:
+            # Avoid using an arbitrary import name in a shell or interpreter snippet.
+            if not dep.isidentifier():
+                missing.append(dep)
                 continue
-
-            logger.info(f"[Crucible] Installing missing or repairing dependency: {pip_name}")
+            script = (
+                "import importlib.util, sys; "
+                "sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)"
+            )
             try:
-                if dep == "speedtest":
-                    subprocess.run([py_exe, "-m", "pip", "uninstall", "-y", "speedtest"], capture_output=True, timeout=30)
-                install_cmd = [py_exe, "-m", "pip", "install", pip_name, "--quiet"]
-                proc = subprocess.run(install_cmd, capture_output=True, text=True, timeout=180)
-                if proc.returncode != 0:
-                    err_sample = proc.stderr.strip()[:180] or "Unknown pip error"
-                    return False, f"Failed to install dependency '{pip_name}': {err_sample}"
-                installed_any.append(pip_name)
-            except subprocess.TimeoutExpired:
-                return False, f"Timeout installing '{pip_name}'."
-            except Exception as e:
-                return False, f"Exception installing '{pip_name}': {e}"
-
-        msg = f"Installed: {', '.join(installed_any)}" if installed_any else "All dependencies satisfied."
-        return True, msg
+                result = subprocess.run(
+                    [py_exe, "-c", script, dep],
+                    capture_output=True, text=True, timeout=7, check=False,
+                )
+                if result.returncode != 0:
+                    missing.append(IMPORT_TO_PIP.get(dep, dep))
+            except (OSError, subprocess.TimeoutExpired):
+                missing.append(IMPORT_TO_PIP.get(dep, dep))
+        if missing:
+            return False, "Hiányzó Python-csomagok: " + ", ".join(sorted(set(missing)))
+        return True, "Minden szükséges csomag már telepítve van."
 
     @classmethod
     def run_sandbox_test(
@@ -210,7 +190,8 @@ class SkillCrucible:
         timeout: float = 75.0
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Executes test cases in an isolated child process to verify runtime correctness.
+        Executes tests in a child process, NOT an OS security sandbox.
+        Call only after explicit user consent to run untrusted generated code.
         Returns: (passed: bool, message: str, telemetry: dict)
         """
         py_exe = _get_python_executable()
@@ -301,7 +282,7 @@ if __name__ == '__main__':
                 pass
 
             if test_results is None:
-                test_results = [{"success": True, "output": output_str[:300]}]
+                return False, "Nem érkezett érvényes teszteredmény a subprocessből.", {"elapsed_s": elapsed}
 
             all_passed = all(t.get("success", False) for t in test_results)
             if not all_passed:
