@@ -1,6 +1,6 @@
 """
 Skill Discovery & Autonomous Intent Detector
-Part of Project Ultron for Brahma AI.
+Part of Project Ultron for Jarvis AI.
 
 Detects capability gaps from voice/text queries, parses explicit "learn this" commands,
 and runs the background idle reflection daemon ("Dream Cycle").
@@ -29,7 +29,7 @@ LEARN_PATTERNS = [
 
 
 class SkillDiscovery:
-    """Detects when Brahma should evolve a new skill."""
+    """Detects when Jarvis AI should evolve a new skill."""
 
     @classmethod
     def analyze_command(cls, text: str) -> Optional[Dict[str, str]]:
