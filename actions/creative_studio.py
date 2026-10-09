@@ -126,7 +126,7 @@ def _launch_args(app: str, binary: str) -> list[str]:
 
 
 class _McpSession:
-    def __init__(self, app: str, binary: str):
+    def __init__(self, app: str, binary: str, command: list[str] | None = None):
         self.app = app
         self.binary = binary
         self.lock = threading.RLock()
@@ -135,7 +135,8 @@ class _McpSession:
         self._tools: dict[str, dict] | None = None
         self._stderr_tail: list[str] = []
         self.process = subprocess.Popen(
-            _launch_args(app, binary), stdin=subprocess.PIPE,
+            (command if command is not None else _launch_args(app, binary)),
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", errors="replace", bufsize=1,
         )
