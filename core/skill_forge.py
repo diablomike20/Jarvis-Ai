@@ -119,11 +119,12 @@ class SkillForge:
         review_dir.mkdir(parents=True, exist_ok=False)
         review_path = review_dir / "candidate.py"
         review_path.write_text(full_code, encoding="utf-8")
-        (review_dir / "proposal.json").write_text(
-            json.dumps({"name": name, "manifest": manifest, "test_cases": cases,
-                        "digest": digest, "goal": goal}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        proposal_text = json.dumps(
+            {"name": name, "manifest": manifest, "test_cases": cases,
+             "digest": digest, "goal": goal}, ensure_ascii=False, indent=2,
         )
+        (review_dir / "proposal.json").write_text(proposal_text, encoding="utf-8")
+        proposal_digest = hashlib.sha256(proposal_text.encode("utf-8")).hexdigest()
 
         from core.confirm import request
         detail = (
@@ -136,7 +137,7 @@ class SkillForge:
         )
         approval = request(
             "forge-" + review_id, "JARVIS új skill jóváhagyása",
-            detail, lambda: cls.approve_draft(review_dir),
+            detail, lambda: cls.approve_draft(review_dir, digest, proposal_digest),
         )
         return {
             "success": True, "pending": True, "name": name,
@@ -146,13 +147,19 @@ class SkillForge:
         }
 
     @classmethod
-    def approve_draft(cls, review_dir: Path) -> str:
-        """Run ONLY the approved draft, then activate without overwriting."""
+    def approve_draft(
+        cls, review_dir: Path, expected_digest: str, expected_proposal_digest: str,
+    ) -> str:
+        """Run ONLY the exact HUD-approved code and metadata (not editable hashes)."""
         try:
             path = Path(review_dir)
-            proposal = json.loads((path / "proposal.json").read_text(encoding="utf-8"))
+            proposal_bytes = (path / "proposal.json").read_bytes()
+            if hashlib.sha256(proposal_bytes).hexdigest() != expected_proposal_digest:
+                return "Elutasítva: a jóváhagyás óta megváltozott a skill leírása."
+            proposal = json.loads(proposal_bytes.decode("utf-8"))
             code = (path / "candidate.py").read_text(encoding="utf-8")
-            if hashlib.sha256(code.encode("utf-8")).hexdigest() != proposal["digest"]:
+            if (hashlib.sha256(code.encode("utf-8")).hexdigest() != expected_digest or
+                    proposal["digest"] != expected_digest):
                 return "Elutasítva: a jóváhagyás óta megváltozott a skillkód."
             name = proposal["name"]
             if not re.fullmatch(r"[a-z][a-z0-9_]{1,63}", name):
@@ -175,8 +182,9 @@ class SkillForge:
             if not good:
                 return f"A tesztek nem sikerültek, a funkció inaktív maradt: {msg}"
             # Ensure the inspected bits did not change during the review/test.
-            if hashlib.sha256((path / "candidate.py").read_bytes()).hexdigest() != proposal["digest"]:
-                return "Elutasítva: a skillkód a teszt közben megváltozott."
+            if (hashlib.sha256((path / "candidate.py").read_bytes()).hexdigest() != expected_digest or
+                    hashlib.sha256((path / "proposal.json").read_bytes()).hexdigest() != expected_proposal_digest):
+                return "Elutasítva: a skill tervezete a teszt közben megváltozott."
             # Only now does it become part of the runnable registry.
             package.mkdir(parents=True, exist_ok=False)
             try:
