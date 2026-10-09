@@ -28,7 +28,7 @@ if platform.system() == "Windows":
 
 from PyQt6.QtCore import (
     QEasingCurve, QEvent, QPoint, QPointF, QRectF, QSize, Qt,
-    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication,
+    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication, QThread,
 )
 from PyQt6.QtGui import (
     QAction, QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
@@ -1466,6 +1466,7 @@ def _default_app_settings() -> dict:
         "attention_call_prompts": True,
         "developer_mode_enabled": False,
         "developer_mode_workspace": "",
+        "jarvis_voice_enabled": False,
     }
 
 
@@ -10362,6 +10363,23 @@ class SettingsHubPage(QWidget):
         lay.addLayout(cards_lay)
         lay.addStretch(2)
 
+class HungarianVoiceTestWorker(QThread):
+    """Run a voice test outside the Qt UI thread; no reference data leaves disk."""
+
+    completed = pyqtSignal(bool)
+
+    def run(self):
+        ok = False
+        try:
+            from actions.jarvis_voice import speak_authorized_hungarian
+            ok = speak_authorized_hungarian(
+                "Üdvözöllek! Itt JARVIS. A magyar hangrendszer tesztelése folyamatban."
+            )
+        except Exception:
+            pass
+        self.completed.emit(ok)
+
+
 class SystemConnectivityPage(QWidget):
     def __init__(self, controller=None, parent=None):
         super().__init__(parent)
@@ -11265,6 +11283,29 @@ class SystemConnectivityPage(QWidget):
         tools_row.addWidget(undo_btn)
         alay.addLayout(tools_row)
 
+        # Live JARVIS XTTS control — opt-in, user-local reference, no auto-download.
+        voice_card = self._card(
+            "JARVIS magyar hang (helyi XTTS-v2)",
+            "A hangminta csak a saját gépeden marad. Az XTTS csak külön engedéllyel "
+            "és érvényes helyi PCM WAV referencia esetén kapcsolható be."
+        )
+        vlay = voice_card.layout()
+        self._hu_voice_enabled_btn = self._mk_toggle(
+            "Magyar XTTS hang engedélyezése",
+            False,
+            self._on_hu_voice_toggled,
+        )
+        vlay.addWidget(self._hu_voice_enabled_btn)
+        self._hu_voice_status_lbl = QLabel("")
+        self._hu_voice_status_lbl.setWordWrap(True)
+        self._hu_voice_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
+        vlay.addWidget(self._hu_voice_status_lbl)
+        self._hu_voice_test_btn = QPushButton("Magyar hang kipróbálása")
+        self._hu_voice_test_btn.clicked.connect(self._test_hu_voice)
+        vlay.addWidget(self._hu_voice_test_btn)
+        alay.addWidget(voice_card)
+        self._refresh_hu_voice_controls()
+
         self._audio_status_lbl = QLabel("Hardware audio deduplication, echo guard and undo stack active.")
         self._audio_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
         alay.addWidget(self._audio_status_lbl)
@@ -11274,6 +11315,78 @@ class SystemConnectivityPage(QWidget):
         lay.addStretch(1)
         return col
 
+
+    def _refresh_hu_voice_controls(self):
+        from actions.jarvis_voice import voice_readiness
+        status = voice_readiness()
+        self._hu_voice_enabled_btn.blockSignals(True)
+        try:
+            self._hu_voice_enabled_btn.setChecked(bool(status["enabled"]))
+        finally:
+            self._hu_voice_enabled_btn.blockSignals(False)
+        self._hu_voice_status_lbl.setText(str(status["reason"]))
+        self._hu_voice_test_btn.setEnabled(
+            bool(status["enabled"] and status["can_enable"])
+            and not (getattr(self, "_hu_voice_worker", None)
+                     and self._hu_voice_worker.isRunning())
+        )
+
+    def _on_hu_voice_toggled(self, enabled: bool):
+        from actions.jarvis_voice import voice_readiness
+        from memory import config_manager
+        if enabled:
+            status = voice_readiness()
+            if not status["can_enable"]:
+                QMessageBox.warning(self, "Magyar XTTS nem használható",
+                                    str(status["reason"]) + "\\n\\n"
+                                    "A helyi referencia és a függőségek előkészítése szükséges.")
+                self._refresh_hu_voice_controls()
+                return
+            result = QMessageBox.question(
+                self, "Magyar hang engedélyezése",
+                "Megerősíted, hogy jogosult vagy a helyi referenciahang "
+                "AI beszédszintézisre történő használatára?\\n\\n"
+                "Az XTTS első hangpróbája a modell letöltésével és a modelllicenc "
+                "elfogadásával járhat. A referenciahang nem kerül felhőbe.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                self._refresh_hu_voice_controls()
+                return
+        try:
+            config_manager.set_setting("jarvis_voice_enabled", bool(enabled))
+            if not enabled:
+                from actions.jarvis_voice import stop_authorized_hungarian
+                stop_authorized_hungarian()
+        except Exception:
+            QMessageBox.warning(self, "Beállítási hiba",
+                                "A hangbeállítást nem sikerült elmenteni.")
+        self._refresh_hu_voice_controls()
+
+    def _test_hu_voice(self):
+        from actions.jarvis_voice import is_configured, voice_readiness
+        if not is_configured() or not voice_readiness()["can_enable"]:
+            self._refresh_hu_voice_controls()
+            return
+        if getattr(self, "_hu_voice_worker", None) and self._hu_voice_worker.isRunning():
+            return
+        self._hu_voice_status_lbl.setText("Magyar hangpróba folyamatban…")
+        self._hu_voice_test_btn.setEnabled(False)
+        worker = HungarianVoiceTestWorker(self)
+        self._hu_voice_worker = worker
+        worker.completed.connect(self._on_hu_voice_test_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def _on_hu_voice_test_completed(self, ok: bool):
+        self._hu_voice_worker = None
+        self._refresh_hu_voice_controls()
+        if not ok:
+            self._hu_voice_status_lbl.setText(
+                "Hangpróba sikertelen. Ellenőrizd az XTTS telepítését és "
+                "a modell licencelfogadását. A rendszer többi hangja megmarad."
+            )
 
     def _on_input_device_changed(self, name: str):
         try:
@@ -12436,6 +12549,8 @@ class SystemConnectivityPage(QWidget):
             self._ctrl().write_log("SYS: Update check requested.")
 
     def refresh(self):
+        if hasattr(self, "_hu_voice_enabled_btn"):
+            self._refresh_hu_voice_controls()
         api = self._load_api_defaults()
         app = self._load_app_settings()
         discord = self._load_discord_settings()
