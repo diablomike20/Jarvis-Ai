@@ -15,16 +15,17 @@ from pathlib import Path
 
 from actions.creative_studio import _McpSession, creative_studio
 from actions.source_cli_adapter import CliCommandAdapter
+from actions.freecad_plugin import FreeCADPluginAdapter, find_freecad_cmd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "integrations" / "sources"
 BUILTIN_EDITORS = {"photocraft", "lightcraft", "filmcraft"}
-_ALLOWED_ADAPTERS = {"creative_studio", "mcp_stdio", "cli_commands"}
+_ALLOWED_ADAPTERS = {"creative_studio", "mcp_stdio", "cli_commands", "freecad_headless"}
 _COMMAND_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _ARGUMENT_TOKEN = re.compile(r"^\{([a-zA-Z][a-zA-Z0-9_]{0,63})\}$")
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 _ENV_PATTERN = re.compile(r"^JARVIS_[A-Z][A-Z0-9_]*_CLI$")
-_sessions: dict[str, tuple[str, _McpSession | CliCommandAdapter]] = {}
+_sessions: dict[str, tuple[str, _McpSession | CliCommandAdapter | FreeCADPluginAdapter]] = {}
 _lock = threading.RLock()
 
 
@@ -64,6 +65,8 @@ def _read_manifest(path: Path) -> dict:
         raise SourcePluginError(f"Nem támogatott adapter: {adapter}")
     if adapter == "creative_studio" and plugin_id not in BUILTIN_EDITORS:
         raise SourcePluginError("A creative_studio adapter csak a három ellenőrzött szerkesztőhöz használható.")
+    if adapter == "freecad_headless" and plugin_id != "freecad":
+        raise SourcePluginError("A freecad_headless adapter kizárólag a jóváhagyott FreeCAD-modulhoz használható.")
     if adapter in ("mcp_stdio", "cli_commands"):
         variable = data.get("executable_env")
         if not isinstance(variable, str) or not _ENV_PATTERN.fullmatch(variable):
@@ -153,6 +156,8 @@ def _binary_for(manifest: dict) -> str | None:
     from actions.creative_studio import _binary_path
     if manifest["adapter"] == "creative_studio":
         return _binary_path(manifest["id"])
+    if manifest["adapter"] == "freecad_headless":
+        return find_freecad_cmd()
     raw = os.environ.get(manifest["executable_env"], "").strip()
     if not raw:
         return None
@@ -163,7 +168,7 @@ def _binary_for(manifest: dict) -> str | None:
     return str(path.resolve())
 
 
-def _session(manifest: dict) -> _McpSession | CliCommandAdapter:
+def _session(manifest: dict) -> _McpSession | CliCommandAdapter | FreeCADPluginAdapter:
     plugin_id = manifest["id"]
     binary = _binary_for(manifest)
     if not binary:
@@ -187,6 +192,8 @@ def _session(manifest: dict) -> _McpSession | CliCommandAdapter:
         try:
             if manifest["adapter"] == "cli_commands":
                 session = CliCommandAdapter(plugin_id, binary, manifest)
+            elif manifest["adapter"] == "freecad_headless":
+                session = FreeCADPluginAdapter(plugin_id, binary)
             else:
                 session = _McpSession(plugin_id, binary, command=argv)
         except Exception as exc:
