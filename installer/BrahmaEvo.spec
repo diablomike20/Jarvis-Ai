@@ -3,6 +3,26 @@ import os
 import sys
 
 cwd = os.path.abspath(os.getcwd())
+# A single installer is built locally with the three editor CLIs already
+# compiled. JARVIS_BUNDLED_ENGINE_DIR is set by build_full_jarvis.ps1.
+engine_stage = os.environ.get("JARVIS_BUNDLED_ENGINE_DIR", "").strip()
+engine_datas = []
+if engine_stage:
+    for app in ("photocraft", "lightcraft", "filmcraft"):
+        root = os.path.join(engine_stage, app)
+        executable = os.path.join(root, app + "-cli.exe")
+        if not os.path.isfile(executable):
+            raise FileNotFoundError("Required bundled editor engine is missing: " + executable)
+        engine_datas.append((executable, os.path.join("editor_engines", app)))
+        for name in sorted(os.listdir(root)):
+            if name.lower().endswith(".dll"):
+                engine_datas.append(
+                    (os.path.join(root, name), os.path.join("editor_engines", app))
+                )
+    licenses = os.path.join(engine_stage, "licenses")
+    if os.path.isdir(licenses):
+        engine_datas.append((licenses, "licenses" + os.sep + "editor_engines"))
+
 
 a = Analysis(
     [os.path.join(cwd, 'main.py')],
@@ -22,10 +42,13 @@ a = Analysis(
         (os.path.join(cwd, 'workspace_store.py'), '.'),
         (os.path.join(cwd, 'README.md'), '.'),
         (os.path.join(cwd, 'requirements.txt'), '.'),
-        (os.path.join(cwd, 'version.txt'), '.')
-    ],
+        (os.path.join(cwd, 'version.txt'), '.'),
+        (os.path.join(cwd, 'integrations', 'sources'), 'integrations/sources'),
+        (os.path.join(cwd, 'docs', 'SOURCE_PLUGINS_HU.md'), 'docs'),
+        (os.path.join(cwd, 'docs', 'CREATIVE_STUDIO_HU.md'), 'docs'),
+    ] + engine_datas,
     hiddenimports=[
-        'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'PyQt6', 'PyQt6.QtWebEngineCore',
+        'mediapipe', 'cv2', 'instagrapi', 'PyQt6', 'PyQt6.QtWebEngineCore',
         'PyQt6.QtWebEngineWidgets', 'PyQt6.QtWebChannel', 'pyautogui', 'sounddevice',
         'keyboard', 'docx', 'pptx', 'multipart', 'passlib', 'bcrypt', 'aiohttp', 'websockets',
         'uvicorn', 'fastapi', 'plyer', 'pydantic', 'typing_extensions', 'requests', 'beautifulsoup4',
