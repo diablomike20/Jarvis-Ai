@@ -25,39 +25,5 @@ jobs:
           python -m pip install -q pytest requests numpy
       - name: Run generic source plugin tests
         run: python -m pytest -q tests/test_source_plugins.py
-      - name: Creative test catalogue_lists_all_three_editors
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_catalogue_lists_all_three_editors
-      - name: Creative test no_cli_is_reported_not_launched
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_no_cli_is_reported_not_launched
-      - name: Creative test photocraft_cli_is_sandboxed_to_working_root
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_photocraft_cli_is_sandboxed_to_working_root
-      - name: Creative test lightcraft_cli_uses_headless_library
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_lightcraft_cli_uses_headless_library
-      - name: Creative test discover_restricts_results_and_reports_real_tool_names
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_discover_restricts_results_and_reports_real_tool_names
-      - name: Creative test read_only_is_executed_without_confirmation
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_read_only_is_executed_without_confirmation
-      - name: Creative test mutating_tool_waits_for_real_hud_confirmation
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_mutating_tool_waits_for_real_hud_confirmation
-      - name: Creative test model_cannot_call_unregistered_tool
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_model_cannot_call_unregistered_tool
-      - name: Creative test batch_requires_one_confirmation
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_batch_requires_one_confirmation
-      - name: Creative test batch_rejects_unknown_step_before_confirmation
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_batch_rejects_unknown_step_before_confirmation
-      - name: Creative test hungarian_creative_intent
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_hungarian_creative_intent
-      - name: Creative test direct_planner_only_executes_discovered_tool
-        if: always()
-        run: python -m pytest -q tests/test_creative_studio.py::test_direct_planner_only_executes_discovered_tool
+      - name: Run Creative Studio editor tests
+        run: python -m pytest -q tests/test_creative_studio.py
