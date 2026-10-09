@@ -27,19 +27,6 @@ CONFIG_DIR = get_user_data_dir() / "config"
 API_CONFIG_PATH = CONFIG_DIR / "api_keys.json"
 
 
-def _get_gemini_api_key() -> str:
-    """Retrieves the Gemini API key from api_keys.json or environment variables."""
-    if API_CONFIG_PATH.exists():
-        try:
-            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                key = data.get("gemini_api_key", "").strip()
-                if key:
-                    return key
-        except Exception:
-            pass
-    return (os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")).strip()
-
 
 class SkillForge:
     """Autonomous synthesizer of new Brahma AI skills."""
@@ -243,7 +230,7 @@ class SkillForge:
 
     @classmethod
     def _call_llm_synthesizer(cls, goal: str, name_hint: str, context_hints: str) -> Dict[str, Any]:
-        """Prompts Gemini to generate the complete skill package JSON."""
+        """Prompts the configured LLM to generate the complete skill package JSON."""
         system_instructions = """You are the Brahma AI Autonomous Skill Architect ("Project Ultron").
 Your mission is to invent, architect, and write a complete, standalone, production-ready Python skill plugin.
 
@@ -276,7 +263,7 @@ Skill Architecture Guidelines:
     "manifest": {
         "name": "snake_case_feature_name",
         "aliases": ["alias_1", "alias_2"],
-        "description": "Concise, actionable description of when and how Gemini Live should call this feature",
+        "description": "Concise, actionable description of when and how the configured LLM should call this feature",
         "triggers": [
             "direct trigger phrase 1",
             "natural variation 2",
@@ -308,33 +295,6 @@ Goal: {goal}
 Preferred Name: {name_hint or 'auto_generate'}
 Additional Context: {context_hints}
 """
-
-        gemini_key = _get_gemini_api_key()
-        if gemini_key:
-            try:
-                from google import genai
-                g_client = genai.Client(api_key=gemini_key, http_options={"api_version": "v1beta"})
-                for model_name in ("gemini-2.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"):
-                    try:
-                        resp = g_client.models.generate_content(
-                            model=model_name,
-                            contents=prompt,
-                            config={
-                                "temperature": 0.2,
-                                "system_instruction": system_instructions,
-                                "response_mime_type": "application/json"
-                            }
-                        )
-                        raw = getattr(resp, "text", "") or ""
-                        data = cls._parse_json_response(raw)
-                        if "manifest" in data and "code" in data:
-                            data["success"] = True
-                            return data
-                    except Exception as e:
-                        logger.warning(f"[Forge] Model {model_name} failed: {e}")
-                        continue
-            except Exception as exc:
-                logger.error(f"[Forge] Gemini client error: {exc}")
 
         # Fallback to Unified llm_client if available
         try:
@@ -378,27 +338,14 @@ Critical Repair Instructions:
     "code": "Fully corrected, runnable Python code"
 }}
 """
-        gemini_key = _get_gemini_api_key()
-        if gemini_key:
-            try:
-                from google import genai
-                g_client = genai.Client(api_key=gemini_key, http_options={"api_version": "v1beta"})
-                for model_name in ("gemini-2.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"):
-                    try:
-                        resp = g_client.models.generate_content(
-                            model=model_name,
-                            contents=prompt,
-                            config={"temperature": 0.1, "response_mime_type": "application/json"}
-                        )
-                        raw = getattr(resp, "text", "") or ""
-                        data = cls._parse_json_response(raw)
-                        if "code" in data:
-                            data["success"] = True
-                            return data
-                    except Exception as e:
-                        logger.warning(f"[Forge] Repair model {model_name} failed: {e}")
-                        continue
-            except Exception as exc:
-                logger.error(f"[Forge] Repair Gemini error: {exc}")
+        try:
+            from llm_client import client as unified_client
+            raw = unified_client.chat(prompt=prompt, temperature=0.1)
+            data = cls._parse_json_response(raw)
+            if isinstance(data.get("code"), str):
+                data["success"] = True
+                return data
+        except Exception as exc:
+            logger.warning(f"[Forge] OpenRouter repair failed: {exc}")
 
         return {"success": False, "error": "Repair attempt failed."}
