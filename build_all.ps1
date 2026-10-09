@@ -1,17 +1,7 @@
-Write-Host "Building Brahma Evo Application..." -ForegroundColor Cyan
-.\.venv\Scripts\pyinstaller.exe installer\BrahmaEvo.spec --noconfirm
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to build main application!" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Main Application built successfully. Now building Setup Wizard..." -ForegroundColor Cyan
-.\.venv\Scripts\pyinstaller.exe installer\BrahmaEvo_Setup.spec --noconfirm
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to build setup wizard!" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Build complete! Setup is located in dist\BrahmaEvo_Setup.exe" -ForegroundColor Green
+# Personal-use, all-in-one JARVIS installer.
+# Build dependencies (Rust/Python/Git) are only needed on the machine BUILDING it.
+# End users need only the resulting dist\BrahmaEvo_Setup.exe.
+# The upstream license forbids redistribution; keep the setup private.
+$ErrorActionPreference = "Stop"
+& "$PSScriptRoot\installer\build_full_jarvis.ps1" @args
+if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
