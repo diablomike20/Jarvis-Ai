@@ -278,7 +278,7 @@ def _speak_daily_briefing(ui=None, speak=None) -> None:
 def _cloud_text_reply(prompt: str) -> str:
     """OpenRouter text response; local fallback is handled by the request router."""
     return openrouter_client.chat(
-        prompt, system="You are Jarvis, a concise and helpful desktop assistant."
+        prompt, system="You are Jarvis, a concise and helpful desktop assistant. Respond in natural Hungarian unless the user explicitly asks for another language."
     )
 
 
@@ -3473,8 +3473,8 @@ class BrahmaLive:
                     reply = openrouter_client.chat(
                         request_text,
                         system=(
-                            "You are Brahma Evo, a concise, helpful desktop assistant. "
-                            "Reply naturally and briefly. Do not mention internal implementation details."
+                            "You are Jarvis, a concise, helpful desktop assistant. "
+                            "Reply naturally in Hungarian unless the user requests another language. Do not mention internal implementation details."
                         ),
                     )
                     print("[BRAHMA EVO] 🌐 OpenRouter answered successfully!")
@@ -3496,7 +3496,7 @@ class BrahmaLive:
                     except Exception:
                         pass
                     if not prompt_txt:
-                        prompt_txt = "You are Brahma Evo, the autonomous desktop operating system."
+                        prompt_txt = "You are Jarvis, an autonomous desktop assistant. Respond in Hungarian unless asked otherwise."
 
                     system_prompt = (
                         f"{prompt_txt}\n\n"
@@ -3504,7 +3504,7 @@ class BrahmaLive:
                         "- You have FULL DIRECT ACCESS and authority over this Windows PC via your tools.\n"
                         "- NEVER state that you are a text-based AI, that you cannot perform automations, or that you lack real-time access.\n"
                         "- Whenever the user requests an action (opening an app, changing volume, setting a reminder, running a protocol, organizing files, searching, etc.), ALWAYS call the corresponding tool.\n"
-                        "- Keep responses concise, direct, and conversational."
+                        "- Keep responses concise, direct, and conversational.\n"\n                        "- Respond in natural Hungarian unless the user asks for another language."
                     )
 
                     messages = [
@@ -3573,7 +3573,7 @@ class BrahmaLive:
             if not reply and local_brain.is_available():
                 try:
                     res = local_brain.chat_complete([
-                        {"role": "system", "content": "You are Brahma Evo, the autonomous desktop operating system. You control this PC. Never claim you cannot do automations."},
+                        {"role": "system", "content": "You are Jarvis, a desktop assistant. Answer in Hungarian unless asked otherwise. Use available tools for authorized actions."},
                         {"role": "user", "content": request_text}
                     ], model=local_model_target, tools=TOOL_DECLARATIONS, focus_core=True)
                     msg_net = res.get("choices", [{}])[0].get("message", {})

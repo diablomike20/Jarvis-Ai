@@ -111,6 +111,13 @@ integration. Existing Gemini keys in user-local config files are no longer read 
 the application; delete them manually if desired. The application still contains
 legacy Brahma branding and upstream license restrictions.
 
+## Magyar, JARVIS-hangulatú beszéd (hangklónozás nélkül)
+
+A JARVIS most a `hu-HU-TamasNeural` magyar férfihanggal,
+enyhén lassabb, mélyebb beszédstílussal is megszólalhat.
+Nem használ filmes hangmintát és nem másolja a szinkronszínész hangját.
+Telepítés és hangpróba: [magyar hangútmutató](docs/JARVIS_VOICE_HU.md).
+
 ## 🚀 Quick Start
 
 ### Prerequisites
