@@ -52,7 +52,7 @@ class IdentityService:
                     assistant = self.data.get("assistant", {})
                     if isinstance(assistant, dict):
                         for key in ("name", "application_name"):
-                            if assistant.get(key) in ("Brahma", "Brahma Evo", "Brahma AI Evo"):
+                            if assistant.get(key) in ("Jarvis AI", "Jarvis AI", "Jarvis AI"):
                                 assistant[key] = "Jarvis AI"
             except Exception as e:
                 print(f"Error loading identity config: {e}")
