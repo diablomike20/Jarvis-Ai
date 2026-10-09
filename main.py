@@ -1796,11 +1796,11 @@ class BrahmaLive:
     def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
         self.ui             = ui
         self._smart_home    = SmartHomeService()
-                self._startup_briefing_started = False
+        self._startup_briefing_started = False
         self._loop          = None
         self._is_speaking   = False
         self._speaking_lock = threading.Lock()
-                self._pending_attention: dict | None = None
+        self._pending_attention: dict | None = None
         self._pending_reply_event: dict | None = None
         self._reply_mode = False
         self._attention_lock = threading.Lock()
