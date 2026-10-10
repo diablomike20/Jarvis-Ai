@@ -22,6 +22,15 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+# Legacy Windows PowerShell sometimes encodes child Python output as cp1252,
+# which cannot represent Hungarian long vowels (e.g. ő, ű).
+$env:PYTHONIOENCODING = "utf-8"
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $OutputEncoding = [Console]::OutputEncoding
+} catch {
+    # Non-interactive hosts may not expose a console; Python override suffices.
+}
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 
 function Invoke-PythonChecked {
