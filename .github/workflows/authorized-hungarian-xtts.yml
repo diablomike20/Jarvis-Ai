@@ -18,7 +18,7 @@ jobs:
           python-version: '3.11'
       - name: Compile integrated voice routing
         run: |
-          python -m py_compile actions/jarvis_voice.py actions/voice_reference.py actions/attention_monitor.py main.py ui.py scripts/voice_doctor.py
+          python -m py_compile actions/jarvis_voice.py actions/voice_reference.py actions/attention_monitor.py main.py ui.py scripts/voice_doctor.py scripts/prepare_xtts_model.py
       - name: Install test runner only (no XTTS model or voice data)
         run: python -m pip install -q pytest
       - name: Provide FFmpeg in CI for synthetic local conversion test
@@ -29,7 +29,7 @@ jobs:
       - name: Run local-only diagnostic on CI's own Python environment
         run: python scripts/voice_doctor.py --json
       - name: Run synthetic WAV and routing regression tests
-        run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py tests/test_voice_doctor.py
+        run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py tests/test_voice_doctor.py tests/test_prepare_xtts_model.py
 
   windows-voice-compatibility:
     runs-on: windows-latest
@@ -40,10 +40,10 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile Windows voice and desktop UI modules
-        run: python -m py_compile actions/jarvis_voice.py actions/voice_reference.py actions/attention_monitor.py main.py ui.py scripts/voice_doctor.py
+        run: python -m py_compile actions/jarvis_voice.py actions/voice_reference.py actions/attention_monitor.py main.py ui.py scripts/voice_doctor.py scripts/prepare_xtts_model.py
       - name: Install test framework only (no reference or model)
         run: python -m pip install -q pytest
       - name: Smoke test Windows diagnostic (no voice files)
         run: python scripts/voice_doctor.py --json
       - name: Validate synthetic audio conversion and voice routing under Windows
-        run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py tests/test_voice_doctor.py
+        run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py tests/test_voice_doctor.py tests/test_prepare_xtts_model.py
