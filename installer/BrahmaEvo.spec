@@ -33,6 +33,10 @@ a = Analysis(
         # keeps .py in PYZ (not on disk), causing WinError 3 at EXE startup.
         # Ship actual source files for the installed Coqui distribution.
         *collect_data_files('TTS', include_py_files=True),
+        # XTTS imports ko_speech_tools.g2p, which dynamically resolves
+        # importlib.resources.files('ko_speech_tools.data'). PyInstaller
+        # misses that package/data tree unless bundled explicitly.
+        *collect_data_files('ko_speech_tools', include_py_files=True),
         # Transformers checks installed torchcodec distribution metadata at import.
         # PyInstaller does NOT copy *.dist-info automatically, despite copying
         # torchcodec's Python package; the frozen EXE crashed here in CI.
@@ -59,7 +63,8 @@ a = Analysis(
         'uvicorn', 'fastapi', 'plyer', 'pydantic', 'typing_extensions', 'requests', 'beautifulsoup4',
         'pyaudio', 'numpy', 'torch', 'torchaudio', 'soundfile', 'imageio_ffmpeg',
         'huggingface_hub', 'torchcodec', *collect_submodules('torchcodec'),
-        *collect_submodules('f5_tts'), *collect_submodules('TTS')
+        *collect_submodules('f5_tts'), *collect_submodules('TTS'),
+        'ko_speech_tools.data', *collect_submodules('ko_speech_tools')
     ],
     hookspath=[],
     hooksconfig={},
