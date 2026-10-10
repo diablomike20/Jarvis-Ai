@@ -54,6 +54,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "F5 Hungarian runtime installation failed." }
           python -m pip install --prefer-binary cached_path hydra-core omegaconf accelerate ema-pytorch pydub pypinyin rjieba tomli safetensors torchdiffeq transformers_stream_generator unidecode vocos x-transformers wandb
           if ($LASTEXITCODE -ne 0) { throw "F5-TTS inference dependencies failed." }
+          # F5-TTS 1.1.22 imports its trainer/data module even when only
+          # the inference API is used. Use actual Windows PyArrow wheels,
+          # never attempt an unbuildable source compilation on the runner.
+          python -m pip install --only-binary=:all: "pyarrow>=17" "datasets>=3,<5"
+          if ($LASTEXITCODE -ne 0) { throw "F5 datasets/pyarrow Windows wheel installation failed." }
           python -c "import numpy, sounddevice, google.genai, google.generativeai; from PyQt6.QtWebEngineWidgets import QWebEngineView; from f5_tts.api import F5TTS; from TTS.api import TTS; print('WINDOWS JARVIS ENGINE IMPORTS OK')"
           if ($LASTEXITCODE -ne 0) { throw "JARVIS Gemini, Qt, F5, XTTS imports failed." }
       - name: Compile full JARVIS desktop application (PyInstaller)
