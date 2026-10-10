@@ -55,7 +55,8 @@ function App(){
  const stopTimers=()=>{sequenceTimers.current.forEach(clearTimeout);sequenceTimers.current=[];};
  const choose=(next:string)=>{stopTimers();apply(next);};
  const timeline=()=>{choose('LISTENING');sequenceTimers.current=[[2300,'THINKING'],[4200,'SPEAKING'],[7200,'SUCCESS'],[8600,'IDLE']].map(([delay,s])=>window.setTimeout(()=>apply(String(s)),Number(delay)));};
- return <main className="layout">
+ const embedded=new URLSearchParams(window.location.search).get('embed')==='1';
+ return <main className={embedded?'layout embedded':'layout'}>
   <header><strong><i/> JARVIS<span>AI</span> <small>/ ORB LAB</small></strong><p>ÖNÁLLÓ TESZTPROTOTÍPUS · EREDETI ANIMÁCIÓ ÉRINTETLEN</p></header>
   <section className="columns">
    <article><div className="section-title">01 / LIVE VISUALIZATION <small>npm 0.1.2 · React + Three.js</small></div>
