@@ -76,6 +76,15 @@ jobs:
           # Catch missing upstream wheel resources BEFORE spending time on a Windows EXE.
           python -c "from importlib.resources import files; folder = files('ko_speech_tools.data'); names = list(folder.iterdir()); assert names, 'ko_speech_tools.data is empty'; print('KO SPEECH RESOURCES:', len(names))"
           if ($LASTEXITCODE -ne 0) { throw "JARVIS Gemini, Qt, F5, XTTS imports failed." }
+      - name: Normalize original JARVIS logo into native Windows BMP ICO
+        shell: pwsh
+        run: |
+          python -m pip install "Pillow>=10,<13"
+          if ($LASTEXITCODE -ne 0) { throw "Pillow for ICO normalization unavailable." }
+          python installer/normalize_windows_icon.py
+          if ($LASTEXITCODE -ne 0) { throw "User-approved JARVIS logo could not be normalized." }
+          python -c "from installer.normalize_windows_icon import inspect_icon; from pathlib import Path; s=inspect_icon(Path('assets/JARVIS_AI_Logo.ico')); assert {16,32,48,64,128,256} <= s; print('JARVIS native ICO validates for Inno Setup:',sorted(s))"
+          if ($LASTEXITCODE -ne 0) { throw "Invalid Windows icon directory." }
       - name: Compile full JARVIS desktop application (PyInstaller)
         shell: pwsh
         run: |
