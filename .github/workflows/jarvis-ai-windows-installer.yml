@@ -65,6 +65,10 @@ jobs:
           # never attempt an unbuildable source compilation on the runner.
           python -m pip install --only-binary=:all: "pyarrow>=17" "datasets>=3,<5"
           if ($LASTEXITCODE -ne 0) { throw "F5 datasets/pyarrow Windows wheel installation failed." }
+          # Coqui requires torchcodec for Torch >= 2.9. Without this,
+          # even 'from TTS.api import TTS' raises on the installed EXE.
+          python -m pip install --prefer-binary "coqui-tts[codec]"
+          if ($LASTEXITCODE -ne 0) { throw "Coqui TorchCodec Windows dependency unavailable." }
           # Coqui XTTS requires isin_mps_friendly, removed from Transformers 5.x.
           python -m pip install "transformers==4.57.6"
           if ($LASTEXITCODE -ne 0) { throw "XTTS compatible Transformers version unavailable." }
