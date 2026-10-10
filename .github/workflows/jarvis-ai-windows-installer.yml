@@ -107,11 +107,15 @@ jobs:
           if (!(Test-Path $koData -PathType Container)) {
             throw "Korean speech data package missing in frozen Windows EXE."
           }
-          $koCount = @(Get-ChildItem $koData -File).Count
-          if ($koCount -lt 1) {
+          # ko_speech_tools.data holds resources in nested directories, not
+          # necessarily at the package root. The former non-recursive check
+          # reported a false failure despite the bundle containing the folder.
+          $koEntries = @(Get-ChildItem $koData -Recurse -File)
+          if ($koEntries.Count -lt 1) {
             throw "Korean speech resources missing from frozen Windows EXE."
           }
-          Write-Host "Coqui g2p resources: $koCount files physically bundled."
+          Write-Host "Coqui g2p resources: $($koEntries.Count) recursively bundled files."
+          $koEntries | Select-Object -First 8 -ExpandProperty FullName | ForEach-Object { Write-Host $_ }
           $sum = ($files | Measure-Object -Sum Length).Sum
           Write-Host "JARVIS binary bundle: $($files.Count) files, $sum bytes."
       - name: Actually run frozen JARVIS EXE startup imports on Windows
