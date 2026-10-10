@@ -25,18 +25,18 @@ def test_gemini_live_original_microphone_and_key_fail_closed():
     assert "tg.create_task(self._listen_audio())" in main
     assert "tg.create_task(self._receive_audio())" in main
     assert "tg.create_task(self._play_audio())" in main
-    mic = _method(main, "BrahmaEngine", "_listen_audio")
+    mic = _method(main, "BrahmaLive", "_listen_audio")
     assert "sd.InputStream(" in mic
     assert "self.out_queue.put_nowait" in mic
-    run = _method(main, "BrahmaEngine", "run")
+    run = _method(main, "BrahmaLive", "run")
     assert "Gemini Live nem indul" in run
     assert 'self.ui.set_state("IDLE")' in run
 
 
 def test_custom_voice_used_for_gemini_turns_and_announcements():
     main = (ROOT / "main.py").read_text(encoding="utf-8")
-    recv = _method(main, "BrahmaEngine", "_receive_audio")
-    speak = _method(main, "BrahmaEngine", "speak")
+    recv = _method(main, "BrahmaLive", "_receive_audio")
+    speak = _method(main, "BrahmaLive", "speak")
     assert "turn_local_voice = None" in recv
     assert 'voice_status["enabled"] and voice_status["can_enable"]' in recv
     assert "buffered_gemini_pcm" in recv
