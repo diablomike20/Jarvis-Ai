@@ -180,6 +180,39 @@ def _private_temp_dir() -> Path:
     return directory
 
 
+def _play_on_selected_speaker(path: Path, cancel: threading.Event) -> bool:
+    """Play directly to JARVIS's selected Windows speaker, not system default.
+
+    Return False only when the user selected the default speaker; in that case
+    the existing winsound route is used. No audio is sent to the network.
+    """
+    from memory import config_manager
+    selected = config_manager.get_output_device()
+    if not selected:
+        return False
+
+    from core import audio_devices
+    device = audio_devices.resolve(selected, "output")
+    if device is None:
+        raise RuntimeError("Selected audio output is not available")
+
+    import sounddevice as sd
+    with wave.open(str(path), "rb") as generated:
+        if generated.getsampwidth() != 2 or generated.getcomptype() != "NONE":
+            raise RuntimeError("Expected 16-bit PCM voice output")
+        with sd.RawOutputStream(
+            samplerate=generated.getframerate(),
+            channels=generated.getnchannels(),
+            dtype="int16", blocksize=1024, device=device,
+        ) as speaker:
+            while not cancel.is_set():
+                payload = generated.readframes(1024)
+                if not payload:
+                    break
+                speaker.write(payload)
+    return True
+
+
 def speak_authorized_hungarian(text: str) -> bool:
     """Return True when handled (including a deliberate stop), else fallback."""
     global _active_cancel
@@ -227,6 +260,10 @@ def speak_authorized_hungarian(text: str) -> bool:
                 )
             if cancel.is_set():
                 return True  # Cancelled speech must NOT trigger the fallback.
+            if _play_on_selected_speaker(output_path, cancel):
+                # Respects Settings > Output Speaker and handles STOP during
+                # synchronous streaming. No system-default-device reroute.
+                return True
             with wave.open(str(output_path), "rb") as generated:
                 seconds = generated.getnframes() / max(1, generated.getframerate())
             winsound.PlaySound(
