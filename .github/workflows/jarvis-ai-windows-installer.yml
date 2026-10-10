@@ -56,6 +56,19 @@ jobs:
           if ($files.Count -lt 50) { throw "Incomplete desktop runtime bundle." }
           $sum = ($files | Measure-Object -Sum Length).Sum
           Write-Host "JARVIS binary bundle: $($files.Count) files, $sum bytes."
+      - name: Actually run frozen JARVIS EXE startup imports on Windows
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist/BrahmaEvo/BrahmaEvo.exe").Path
+          $proc = Start-Process -FilePath $exe -ArgumentList "--smoke-imports" -WorkingDirectory (Get-Location).Path -PassThru
+          if (-not $proc.WaitForExit(90000)) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Frozen JARVIS import smoke timed out. EXE must work before packaging."
+          }
+          if ($proc.ExitCode -ne 0) {
+            throw "Frozen JARVIS import smoke failed (exit code $($proc.ExitCode)). Do not publish setup."
+          }
+          Write-Host "Verified: actual packaged JARVIS EXE completes its startup imports."
       - name: Find or install Inno Setup compiler
         shell: pwsh
         run: |
@@ -89,7 +102,7 @@ jobs:
             "App SHA256: $((Get-FileHash $app -Algorithm SHA256).Hash)"
             "Model weights: NOT included (license + user consent)"
             "Private voice references: NOT included"
-            "Status: Compiled PE + installer; physical machine GUI and XTTS sound still need verification"
+            "Status: Compiled PE + installer + frozen EXE startup import smoke; physical Windows GUI and XTTS sound still need verification"
           )
           $report | Set-Content -Path dist/installer/BUILD_INFO.txt -Encoding UTF8
           Get-Item $setup, $app | Select-Object FullName,Length | Format-Table -AutoSize
