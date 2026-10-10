@@ -11500,7 +11500,7 @@ class SystemConnectivityPage(QWidget):
         )
 
     def _launch_hu_voice_setup(self):
-        """Prepare the selected model inside the installed EXE; no developer .venv."""
+        """Prepare the selected model from inside the installed desktop EXE."""
         if platform.system() != "Windows":
             QMessageBox.information(self, "Magyar hang", "A telepített hangmotor Windows alatt támogatott.")
             return
