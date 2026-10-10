@@ -100,3 +100,20 @@ def test_actual_ui_has_explicit_consent_and_test_worker():
     assert "QMessageBox.question" in code
     assert "stop_authorized_hungarian" in code
     assert 'self._hu_voice_enabled_btn = self._mk_toggle(' in code
+
+
+def test_private_voice_workers_do_not_outlive_qthread_shutdown():
+    """Ensure slow, user-consented model initialization is a daemon task."""
+    source = (Path(__file__).resolve().parents[1] / "ui.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    classes = {n.name: n for n in tree.body if isinstance(n, ast.ClassDef)}
+    assert "_DaemonVoiceWorker" in classes
+    for worker in ("HungarianVoiceImportWorker", "HungarianVoiceTestWorker"):
+        bases = classes[worker].bases
+        assert len(bases) == 1
+        assert isinstance(bases[0], ast.Name)
+        assert bases[0].id == "_DaemonVoiceWorker"
+    core = ast.get_source_segment(source, classes["_DaemonVoiceWorker"])
+    assert "daemon=True" in core
+    assert "threading.Thread(" in core
+    assert "self.finished.emit()" in core
