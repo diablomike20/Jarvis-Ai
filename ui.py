@@ -10393,6 +10393,65 @@ class _DaemonVoiceWorker(QObject):
                 pass  # Parent window may have been closed during model loading.
 
 
+class JarvisMicrophoneTestWorker(_DaemonVoiceWorker):
+    """Check microphone capture in the EXE without uploading/recording audio."""
+
+    completed = pyqtSignal(bool, str)
+
+    def run(self):
+        try:
+            import sounddevice as sd
+            import numpy as np
+            from core import audio_devices
+            from memory import config_manager
+
+            chosen = config_manager.get_input_device()
+            device = audio_devices.resolve(chosen, "input") if chosen else None
+            if device is None:
+                names = audio_devices.list_devices("input")
+                if not names:
+                    raise RuntimeError("No input microphone")
+                chosen = names[0]
+                device = audio_devices.resolve(chosen, "input")
+            if device is None:
+                raise RuntimeError("Invalid selected microphone")
+
+            peak = 0.0
+            with sd.InputStream(
+                samplerate=16000, channels=1, dtype="int16",
+                blocksize=1024, device=device,
+            ) as stream:
+                # About three seconds, bounded read in a background daemon.
+                for _ in range(47):
+                    samples, _overflow = stream.read(1024)
+                    if samples.size:
+                        peak = max(
+                            peak, float(np.max(np.abs(samples.astype(np.float32)))) / 32768.0
+                        )
+            if peak < 0.003:
+                result = (
+                    False,
+                    "A mikrofon megnyílik, de nem érzékelhető beszéd. "
+                    "Ellenőrizd a bemenetet és a Windows mikrofonengedélyeit."
+                )
+            else:
+                result = (
+                    True,
+                    "A mikrofon hangot érzékel. A Gemini Live API-kulcs "
+                    "és internetkapcsolat külön szükséges a beszélgetéshez."
+                )
+        except Exception as exc:
+            result = (
+                False,
+                "A kiválasztott mikrofon nem nyitható meg ("
+                + type(exc).__name__ + "). Ellenőrizd az eszközt és a Windows engedélyeit."
+            )
+        try:
+            self.completed.emit(*result)
+        except RuntimeError:
+            pass
+
+
 class HungarianVoiceSetupWorker(_DaemonVoiceWorker):
     """User-confirmed public model preparation; never reads private reference."""
 
@@ -11360,6 +11419,9 @@ class SystemConnectivityPage(QWidget):
             self._on_ptt_toggled
         )
         tools_row.addWidget(self._ptt_toggle)
+        self._mic_test_btn = QPushButton("Mikrofon próba (3 s)")
+        self._mic_test_btn.clicked.connect(self._start_jarvis_mic_test)
+        tools_row.addWidget(self._mic_test_btn)
 
         mem_btn = QPushButton("🧠 Inspect Memory")
         mem_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -11647,6 +11709,22 @@ class SystemConnectivityPage(QWidget):
                 "Hangpróba sikertelen. Ellenőrizd az XTTS telepítését és "
                 "a modell licencelfogadását. A rendszer többi hangja megmarad."
             )
+
+    def _start_jarvis_mic_test(self):
+        if getattr(self, "_jarvis_mic_test_worker", None) and self._jarvis_mic_test_worker.isRunning():
+            return
+        worker = JarvisMicrophoneTestWorker(self)
+        self._jarvis_mic_test_worker = worker
+        self._mic_test_btn.setEnabled(False)
+        self._audio_status_lbl.setText("Mikrofon mérése 3 másodpercig — beszélj a kiválasztott bemenetbe.")
+        worker.completed.connect(self._on_jarvis_mic_test_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def _on_jarvis_mic_test_completed(self, ok: bool, message: str):
+        self._jarvis_mic_test_worker = None
+        self._mic_test_btn.setEnabled(True)
+        self._audio_status_lbl.setText(("✅ " if ok else "⚠️ ") + message)
 
     def _on_input_device_changed(self, name: str):
         try:
