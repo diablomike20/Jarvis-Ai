@@ -34,7 +34,7 @@ def test_local_model_files_require_checkpoint_and_vocab(local_model):
     with ckpt.open("wb") as handle:
         handle.truncate(f5_hungarian.MIN_MODEL_BYTES + 1)
     assert f5_hungarian.assets_ready() is False
-    vocab.write_text("a\nb\nc\ná\né\nő\n", encoding="utf-8")
+    vocab.write_text("Hungarian vocabulary text with á é ő ű\n", encoding="utf-8")
     assert f5_hungarian.assets_ready() is True
 
 
