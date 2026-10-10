@@ -107,6 +107,10 @@ def test_no_ffmpeg_reports_necessary_local_dependency(private_dir, tmp_path, mon
     path = tmp_path / "audio.mp3"
     path.write_bytes(b"some content")
     monkeypatch.setattr(voice_reference.shutil, "which", lambda name: None)
+    import sys, types
+    fake = types.ModuleType("imageio_ffmpeg")
+    fake.get_ffmpeg_exe = lambda: (_ for _ in ()).throw(OSError("unavailable"))
+    monkeypatch.setitem(sys.modules, "imageio_ffmpeg", fake)
     with pytest.raises(voice_reference.ReferencePreparationError, match="FFmpeg"):
         voice_reference.prepare_reference(path)
 
