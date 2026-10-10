@@ -73,6 +73,8 @@ jobs:
           python -m pip install "transformers==4.57.6"
           if ($LASTEXITCODE -ne 0) { throw "XTTS compatible Transformers version unavailable." }
           python -c "import numpy, sounddevice, google.genai, google.generativeai; from PyQt6.QtWebEngineWidgets import QWebEngineView; from f5_tts.api import F5TTS; from TTS.api import TTS; print('WINDOWS JARVIS ENGINE IMPORTS OK')"
+          # Catch missing upstream wheel resources BEFORE spending time on a Windows EXE.
+          python -c "from importlib.resources import files; folder = files('ko_speech_tools.data'); names = list(folder.iterdir()); assert names, 'ko_speech_tools.data is empty'; print('KO SPEECH RESOURCES:', len(names))"
           if ($LASTEXITCODE -ne 0) { throw "JARVIS Gemini, Qt, F5, XTTS imports failed." }
       - name: Compile full JARVIS desktop application (PyInstaller)
         shell: pwsh
@@ -99,6 +101,17 @@ jobs:
             throw "Coqui vocoder config source files missing from frozen bundle."
           }
           Write-Host "Coqui vocoder filesystem discovery: $cfgCount physical configs verified."
+          # XTTS g2p imports importlib.resources.files('ko_speech_tools.data').
+          # A source-only package in PyInstaller's PYZ is insufficient.
+          $koData = "dist/BrahmaEvo/_internal/ko_speech_tools/data"
+          if (!(Test-Path $koData -PathType Container)) {
+            throw "Korean speech data package missing in frozen Windows EXE."
+          }
+          $koCount = @(Get-ChildItem $koData -File).Count
+          if ($koCount -lt 1) {
+            throw "Korean speech resources missing from frozen Windows EXE."
+          }
+          Write-Host "Coqui g2p resources: $koCount files physically bundled."
           $sum = ($files | Measure-Object -Sum Length).Sum
           Write-Host "JARVIS binary bundle: $($files.Count) files, $sum bytes."
       - name: Actually run frozen JARVIS EXE startup imports on Windows
