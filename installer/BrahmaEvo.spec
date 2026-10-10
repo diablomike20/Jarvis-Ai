@@ -33,7 +33,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[os.path.join(cwd, 'installer', 'frozen_smoke_runtime.py')],
     excludes=[],
     noarchive=False,
     optimize=0,
