@@ -23,6 +23,7 @@ SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
 UninstallDisplayIcon={app}\{#MainExe}
+SetupIconFile=..\assets\JARVIS_AI_Logo.ico
 ChangesEnvironment=no
 CloseApplications=yes
 RestartApplications=no
