@@ -55,6 +55,12 @@ a = Analysis(
         # Bundle the original .py sources alongside bytecode for inspection.
         *collect_data_files('x_transformers', include_py_files=True,
                             includes=['**/*.py']),
+        # Coqui -> inflect -> typeguard: @typechecked introspects
+        # the original inflect.engine source during module import.
+        # The compiled PYZ contains bytecode but inspect.getsource() needs
+        # physical Python sources in _internal/inflect and _internal/typeguard.
+        *collect_data_files('inflect', include_py_files=True),
+        *collect_data_files('typeguard', include_py_files=True),
     ],
     hiddenimports=[
         'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'google.generativeai', 'PyQt6', 'PyQt6.QtWebEngineCore',
