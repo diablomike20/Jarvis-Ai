@@ -41,6 +41,12 @@ a = Analysis(
         *copy_metadata('safetensors'),
         *copy_metadata('tokenizers'),
         *collect_data_files('torchcodec'),
+        # x-transformers defines @torch.jit.script functions (e.g. softclamp)
+        # during import. TorchScript calls inspect.getsource(), which fails
+        # against source-less modules in PyInstaller's PYZ archive.
+        # Bundle the original .py sources alongside bytecode for inspection.
+        *collect_data_files('x_transformers', include_py_files=True,
+                            includes=['**/*.py']),
     ],
     hiddenimports=[
         'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'google.generativeai', 'PyQt6', 'PyQt6.QtWebEngineCore',
