@@ -16,8 +16,11 @@ from pathlib import Path
 
 from PIL import Image
 
-DEFAULT_SOURCE = Path("assets/JARVIS_AI_Logo.ico")
+# Never decode the corrupted 2.5 KB ICO from earlier builds. Instead,
+# regenerate the Windows icon from the user's approved JARVIS logo image.
+DEFAULT_SOURCE = Path("assets/JARVIS_AI_Logo_source.png")
 REQUIRED_SIZES = (16, 32, 48, 64, 128, 256)
+DEFAULT_OUTPUT = Path("assets/JARVIS_AI_Logo.ico")
 
 
 def inspect_icon(path: Path) -> set[int]:
@@ -81,7 +84,7 @@ def normalize_icon(source: Path, output: Path) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
-    parser.add_argument("--output", type=Path, default=DEFAULT_SOURCE)
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
     normalized = normalize_icon(args.source, args.output)
     print("Windows-compatible JARVIS ICO:", normalized,
