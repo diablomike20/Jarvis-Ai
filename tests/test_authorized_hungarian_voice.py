@@ -242,3 +242,61 @@ def test_stop_invalidates_only_prior_requests(reference, monkeypatch):
     monkeypatch.setattr(jarvis_voice, "_load_model", lambda: FakeXTTS())
     assert jarvis_voice.speak_authorized_hungarian("Új kérés.") is True
     assert any(path is not None for path, flags in calls)
+
+
+def test_private_voice_respects_selected_sony_tv_output(reference, monkeypatch):
+    """JARVIS Output Speaker selection must not silently play on defaults."""
+    from core import audio_devices
+    from memory import config_manager
+    monkeypatch.setattr(config_manager, "get_output_device", lambda: "SONY TV")
+    monkeypatch.setattr(audio_devices, "resolve", lambda name, kind: 7 if name == "SONY TV" and kind == "output" else None)
+
+    streams = []
+    played = []
+
+    class FakeRawOutputStream:
+        def __init__(self, **kwargs):
+            streams.append(kwargs)
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def write(self, chunk):
+            played.append(chunk)
+
+    fake_sd = types.ModuleType("sounddevice")
+    fake_sd.RawOutputStream = FakeRawOutputStream
+    monkeypatch.setitem(sys.modules, "sounddevice", fake_sd)
+
+    stop = threading.Event()
+    assert jarvis_voice._play_on_selected_speaker(reference, stop)
+    assert streams[0]["device"] == 7
+    assert streams[0]["channels"] == 1
+    assert played
+    assert all(isinstance(data, bytes) for data in played)
+
+
+def test_private_voice_stop_interrupts_selected_device_stream(reference, monkeypatch):
+    from core import audio_devices
+    from memory import config_manager
+    monkeypatch.setattr(config_manager, "get_output_device", lambda: "SONY TV")
+    monkeypatch.setattr(audio_devices, "resolve", lambda name, kind: 7)
+    stop = threading.Event()
+    sent = []
+
+    class FakeStream:
+        def __init__(self, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def write(self, data):
+            sent.append(data)
+            stop.set()
+
+    fake_sd = types.ModuleType("sounddevice")
+    fake_sd.RawOutputStream = FakeStream
+    monkeypatch.setitem(sys.modules, "sounddevice", fake_sd)
+    assert jarvis_voice._play_on_selected_speaker(reference, stop)
+    assert len(sent) == 1
