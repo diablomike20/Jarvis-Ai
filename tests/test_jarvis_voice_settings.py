@@ -127,9 +127,10 @@ def test_runtime_setup_in_real_audio_settings_is_explicitly_approved():
     body = ast.get_source_segment(source, method)
     assert "QMessageBox.question(" in body
     assert "StandardButton.Yes" in body
-    assert 'choice != QMessageBox.StandardButton.Yes' in body
-    assert "subprocess.Popen(" in body
-    assert "CREATE_NEW_CONSOLE" in body
-    assert "setup_hungarian_voice.ps1" in body
+    assert 'approved != QMessageBox.StandardButton.Yes' in body
+    assert "HungarianVoiceSetupWorker(" in body
+    assert "CC-BY-NC-4.0" in body
+    assert "subprocess.Popen(" not in body
+    assert ".venv" not in body
     assert "get_user_data_dir" not in body
     assert 'self._hu_voice_setup_btn.clicked.connect(self._launch_hu_voice_setup)' in source
