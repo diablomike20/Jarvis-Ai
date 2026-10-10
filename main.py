@@ -4975,6 +4975,15 @@ class BrahmaLive:
     async def _receive_audio(self):
         print("[BRAHMA EVO] 👂 Recv started")
         out_buf, in_buf = [], []
+        buffered_gemini_pcm = []
+        try:
+            from actions.jarvis_voice import voice_readiness
+            voice_status = voice_readiness()
+            use_local_voice = bool(voice_status["enabled"] and voice_status["can_enable"])
+            if use_local_voice:
+                self.ui.write_log("SYS: Gemini Live + JARVIS helyi egyedi magyar hang bekapcsolva.")
+        except Exception:
+            use_local_voice = False
 
         try:
             while True:
@@ -4985,8 +4994,11 @@ class BrahmaLive:
                             self._resume_handle = _sru.new_handle
 
                     if response.data:
-                        self.set_speaking(True)
-                        self.audio_in_queue.put_nowait(response.data)
+                        if use_local_voice:
+                            buffered_gemini_pcm.append(response.data)
+                        else:
+                            self.set_speaking(True)
+                            self.audio_in_queue.put_nowait(response.data)
 
                     if response.server_content:
                         sc = response.server_content
@@ -5023,8 +5035,47 @@ class BrahmaLive:
 
                             full_out = " ".join(out_buf).strip()
                             if full_out:
-                                self.ui.write_log(f"Brahma Evo: {full_out}")
+                                self.ui.write_log(f"JARVIS AI: {full_out}")
                             out_buf = []
+
+                            # Gemini still does the original Live reasoning, tool
+                            # handling and microphone recognition. Its audio is
+                            # buffered only when the user has explicitly enabled
+                            # a ready private local F5 / XTTS voice.
+                            if use_local_voice:
+                                original_pcm = tuple(buffered_gemini_pcm)
+                                buffered_gemini_pcm.clear()
+                                if full_out:
+                                    self.set_speaking(True)
+                                    def _deliver_custom_voice(utterance, fallback_pcm):
+                                        played = False
+                                        try:
+                                            from actions.jarvis_voice import speak_authorized_hungarian
+                                            played = speak_authorized_hungarian(utterance)
+                                        except Exception:
+                                            pass
+                                        if not played and self._loop is not None:
+                                            # Never lose the spoken response if local
+                                            # synthesis fails. Play Gemini PCM instead.
+                                            for audio in fallback_pcm:
+                                                self._loop.call_soon_threadsafe(
+                                                    self.audio_in_queue.put_nowait, audio
+                                                )
+                                            self._loop.call_soon_threadsafe(
+                                                self.audio_in_queue.put_nowait, None
+                                            )
+                                        else:
+                                            self.set_speaking(False)
+                                    threading.Thread(
+                                        target=_deliver_custom_voice,
+                                        args=(full_out, original_pcm),
+                                        daemon=True, name="jarvis-live-custom-voice",
+                                    ).start()
+                                elif original_pcm:
+                                    self.set_speaking(True)
+                                    for audio in original_pcm:
+                                        self.audio_in_queue.put_nowait(audio)
+                                    self.audio_in_queue.put_nowait(None)
 
                             if full_in and len(full_in) > 5:
                                 threading.Thread(
@@ -5069,6 +5120,9 @@ class BrahmaLive:
         try:
             while True:
                 chunk = await self.audio_in_queue.get()
+                if chunk is None:
+                    self.set_speaking(False)
+                    continue
                 try:
                     pcm = np.frombuffer(chunk, dtype=np.int16)
                     lvl = float(np.sqrt(np.mean(np.square(pcm, dtype=np.float32))))
