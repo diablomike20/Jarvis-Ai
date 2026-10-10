@@ -16,7 +16,7 @@ from pathlib import Path
 from core.user_paths import get_user_data_dir
 
 REFERENCE_NAME = "jarvis_hu_authorized.wav"
-CLIP_SECONDS = 25
+CLIP_SECONDS = 12  # F5-TTS Hungarian recommends 5-15 seconds of reference.
 
 
 class ReferencePreparationError(RuntimeError):
@@ -58,9 +58,11 @@ def prepare_reference(source: str | Path, *, start_seconds: int = 0) -> Path:
 
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
-        raise ReferencePreparationError(
-            "Hiányzik az FFmpeg. Telepítsd helyben, és add hozzá a PATH környezeti változóhoz."
-        )
+        try:
+            import imageio_ffmpeg
+            ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        except (ImportError, OSError, RuntimeError):
+            ffmpeg = None
 
     dest = target_reference_path()
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -80,6 +82,35 @@ def prepare_reference(source: str | Path, *, start_seconds: int = 0) -> Path:
             dir=dest.parent, delete=False
         ) as output:
             tmp = Path(output.name)
+        if not ffmpeg:
+            # Windows EXE can still import a ready PCM WAV without external tools.
+            if source.suffix.lower() != ".wav":
+                raise ReferencePreparationError(
+                    "Az MP3 előkészítéshez hiányzik a beépített FFmpeg. Válassz PCM WAV-fájlt."
+                )
+            try:
+                with wave.open(str(source), "rb") as inp:
+                    if (inp.getnchannels(), inp.getsampwidth(), inp.getframerate(), inp.getcomptype()) != (
+                        1, 2, 24000, "NONE"
+                    ):
+                        raise ReferencePreparationError("A WAV nem 24 kHz mono, 16 bites PCM.")
+                    if inp.getnframes() < 3 * 24000:
+                        raise ReferencePreparationError("A referencia minimum 3 másodperces legyen.")
+                    inp.setpos(min(start_seconds * 24000, max(0, inp.getnframes() - 3 * 24000)))
+                    payload = inp.readframes(CLIP_SECONDS * 24000)
+                with wave.open(str(tmp), "wb") as out:
+                    out.setnchannels(1)
+                    out.setsampwidth(2)
+                    out.setframerate(24000)
+                    out.writeframes(payload)
+            except (wave.Error, OSError, EOFError):
+                raise ReferencePreparationError("A kiválasztott PCM WAV nem olvasható.") from None
+            if not _check_pcm_clip(tmp):
+                raise ReferencePreparationError("Nem sikerült a WAV referencia előkészítése.")
+            os.replace(tmp, dest)
+            tmp = None
+            return dest
+
         command = [
             ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
             "-ss", str(start_seconds), "-i", str(source), "-t", str(CLIP_SECONDS),
@@ -98,7 +129,7 @@ def prepare_reference(source: str | Path, *, start_seconds: int = 0) -> Path:
 
         if result.returncode != 0 or not _check_pcm_clip(tmp):
             raise ReferencePreparationError(
-                "Nem sikerült érvényes 3–25 másodperces PCM WAV-részletet létrehozni."
+                "Nem sikerült érvényes 3–12 másodperces PCM WAV-részletet létrehozni."
             )
         # Staged write, no partial overwrite on error.
         os.replace(tmp, dest)
