@@ -101,6 +101,17 @@ jobs:
             throw "Coqui vocoder config source files missing from frozen bundle."
           }
           Write-Host "Coqui vocoder filesystem discovery: $cfgCount physical configs verified."
+          # inflect's @typechecked decorators inspect the original Python
+          # source while importing Coqui in the frozen executable.
+          foreach ($sourceFile in @(
+            "dist/BrahmaEvo/_internal/inflect/__init__.py",
+            "dist/BrahmaEvo/_internal/typeguard/_decorators.py"
+          )) {
+            if (!(Test-Path $sourceFile -PathType Leaf)) {
+              throw "Introspection-dependent Coqui Python source is missing: $sourceFile"
+            }
+          }
+          Write-Host "inflect/typeguard introspection source files verified."
           # XTTS g2p imports importlib.resources.files('ko_speech_tools.data').
           # A source-only package in PyInstaller's PYZ is insufficient.
           $koData = "dist/BrahmaEvo/_internal/ko_speech_tools/data"
