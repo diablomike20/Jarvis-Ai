@@ -23,6 +23,7 @@ _LANGUAGE = "hu"
 _speech_lock = threading.Lock()
 _state_lock = threading.Lock()
 _active_cancel: threading.Event | None = None
+_stop_epoch = 0  # Invalidates utterances already queued when STOP is pressed.
 
 
 def reference_wav_path() -> Path:
@@ -122,8 +123,10 @@ def _load_model():
 
 
 def stop_authorized_hungarian() -> None:
-    """Interrupt playback; running model inference finishes but is discarded."""
+    """Interrupt current playback and invalidate work queued before STOP."""
+    global _stop_epoch
     with _state_lock:
+        _stop_epoch += 1
         cancel = _active_cancel
         if cancel is not None:
             cancel.set()
@@ -155,13 +158,18 @@ def speak_authorized_hungarian(text: str) -> bool:
     if not text or not _is_windows() or not is_configured():
         return False
 
+    # Each invocation captures STOP generation before waiting on the
+    # speech lock. Without this, an already queued utterance could start
+    # after the user presses STOP.
+    with _state_lock:
+        request_epoch = _stop_epoch
     with _speech_lock:
-        # A queued utterance must not start after the user disables XTTS
-        # while another utterance holds the speech lock.
         if not is_configured():
             return False
-        cancel = threading.Event()
         with _state_lock:
+            if request_epoch != _stop_epoch:
+                return True  # Deliberately cancelled: never fall back to Edge.
+            cancel = threading.Event()
             _active_cancel = cancel
         output_path = None
         try:
