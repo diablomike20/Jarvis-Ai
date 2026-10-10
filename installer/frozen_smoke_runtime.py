@@ -24,6 +24,7 @@ if "--smoke-imports" in sys.argv and os.environ.get("JARVIS_STARTUP_SMOKE_REPORT
             _jarvis_smoke_stream.write("frozen smoke: unhandled Python exception\n")
             traceback.print_exception(exc_type, exc, tb, file=_jarvis_smoke_stream)
             _jarvis_smoke_stream.flush()
+            os._exit(23)  # CI smoke only: do not hang behind a PyInstaller GUI error dialog.
 
         sys.excepthook = _jarvis_smoke_excepthook
     except OSError:
