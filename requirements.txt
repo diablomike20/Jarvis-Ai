@@ -40,3 +40,6 @@ speedtest-cli
 
 # Current Google Gen AI SDK used by workspace_store and other integrations
 google-genai
+
+# Legacy Gemini file-processor API, still required by actions/file_processor.py
+google-generativeai>=0.8,<1
