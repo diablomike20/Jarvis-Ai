@@ -25,6 +25,10 @@ a = Analysis(
         (os.path.join(cwd, 'requirements.txt'), '.'),
         (os.path.join(cwd, 'version.txt'), '.'),
         *collect_data_files('imageio_ffmpeg', includes=['binaries/*']),
+        # The *real* F5 runtime opens configs/F5TTS_v1_Base.yaml via
+        # importlib.resources. collect_submodules alone omits this YAML.
+        *collect_data_files('f5_tts'),
+        *collect_data_files('TTS'),
     ],
     hiddenimports=[
         'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'google.generativeai', 'PyQt6', 'PyQt6.QtWebEngineCore',
