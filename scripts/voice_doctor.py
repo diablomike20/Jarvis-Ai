@@ -11,6 +11,7 @@ are printed. No microphone access, speech generation or network requests.
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.metadata
 import json
 import platform
@@ -27,6 +28,27 @@ def _version(dist_name: str) -> str | None:
         return importlib.metadata.version(dist_name)
     except importlib.metadata.PackageNotFoundError:
         return None
+
+
+def probe_runtime_imports() -> dict:
+    """Import selected installed runtimes without loading/downloading models.
+
+    Opt-in because importing Torch can take time. Errors are redacted to
+    class names; Python tracebacks may contain private installation paths.
+    """
+    results = {"torch_import_ok": False, "coqui_api_import_ok": False, "cuda_available": False}
+    try:
+        torch = importlib.import_module("torch")
+        results["torch_import_ok"] = True
+        results["cuda_available"] = bool(torch.cuda.is_available())
+    except Exception as exc:
+        results["torch_error_type"] = type(exc).__name__
+    try:
+        api = importlib.import_module("TTS.api")
+        results["coqui_api_import_ok"] = bool(getattr(api, "TTS", None))
+    except Exception as exc:
+        results["coqui_error_type"] = type(exc).__name__
+    return results
 
 
 def inspect_environment() -> dict:
@@ -81,8 +103,11 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="JARVIS XTTS local-only preflight")
     parser.add_argument("--json", action="store_true", help="Machine-readable, sanitized status")
     parser.add_argument("--strict", action="store_true", help="Nonzero exit if prerequisites are missing")
+    parser.add_argument("--probe-runtime", action="store_true", help="Import Torch and Coqui API locally without model load")
     args = parser.parse_args(argv)
     status = inspect_environment()
+    if args.probe_runtime:
+        status["runtime_import_probe"] = probe_runtime_imports()
     if args.json:
         print(json.dumps(status, indent=2, ensure_ascii=False))
     else:
@@ -92,10 +117,16 @@ def main(argv=None) -> int:
         print("Privát PCM WAV:", "érvényes" if status["reference_pcm_wav_valid"] else "hiányzik/hibás")
         print("XTTS függőségek:", "észlelhetők" if status["required_modules_present"] else "hiányosak")
         print("Engedélyezve:", "igen" if status["xtts_enabled"] else "nem")
+        if args.probe_runtime:
+            print("Runtime importellenőrzés:", json.dumps(status["runtime_import_probe"], ensure_ascii=False))
         print("Javaslatok:")
         for advice in hints(status):
             print(" -", advice)
-    return 2 if args.strict and not status["xtts_runtime_plausible"] else 0
+    ready = status["xtts_runtime_plausible"]
+    if args.probe_runtime:
+        probes = status["runtime_import_probe"]
+        ready = ready and probes["torch_import_ok"] and probes["coqui_api_import_ok"]
+    return 2 if args.strict and not ready else 0
 
 
 if __name__ == "__main__":
