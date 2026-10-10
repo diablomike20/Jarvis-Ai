@@ -4938,6 +4938,24 @@ if __name__ == "__main__":
     import os
     import traceback
 
+    # Windows installer smoke check. This runs inside the FROZEN EXE after
+    # executing the same top-level imports as normal JARVIS startup, but
+    # intentionally avoids starting the GUI, microphone or network services.
+    # CI treats any missing frozen dependency as a build failure.
+    if "--smoke-imports" in sys.argv:
+        import importlib
+        for module_name in (
+            "google.genai",
+            "PyQt6.QtWebEngineWidgets",
+            "workspace_store",
+            "actions.jarvis_voice",
+            "actions.voice_reference",
+            "memory.config_manager",
+        ):
+            importlib.import_module(module_name)
+        print("JARVIS FROZEN STARTUP IMPORTS OK", flush=True)
+        sys.exit(0)
+
     # Intercept subprocess calls when running as PyInstaller .exe
     if len(sys.argv) >= 2:
         if sys.argv[1].endswith(".py") and os.path.exists(sys.argv[1]):
