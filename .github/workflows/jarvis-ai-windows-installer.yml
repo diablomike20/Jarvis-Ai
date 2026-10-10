@@ -65,6 +65,9 @@ jobs:
           # never attempt an unbuildable source compilation on the runner.
           python -m pip install --only-binary=:all: "pyarrow>=17" "datasets>=3,<5"
           if ($LASTEXITCODE -ne 0) { throw "F5 datasets/pyarrow Windows wheel installation failed." }
+          # Coqui XTTS requires isin_mps_friendly, removed from Transformers 5.x.
+          python -m pip install "transformers==4.57.6"
+          if ($LASTEXITCODE -ne 0) { throw "XTTS compatible Transformers version unavailable." }
           python -c "import numpy, sounddevice, google.genai, google.generativeai; from PyQt6.QtWebEngineWidgets import QWebEngineView; from f5_tts.api import F5TTS; from TTS.api import TTS; print('WINDOWS JARVIS ENGINE IMPORTS OK')"
           if ($LASTEXITCODE -ne 0) { throw "JARVIS Gemini, Qt, F5, XTTS imports failed." }
       - name: Compile full JARVIS desktop application (PyInstaller)
