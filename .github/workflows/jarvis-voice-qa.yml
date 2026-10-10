@@ -1,0 +1,30 @@
+name: JARVIS voice integration regression
+
+on:
+  push:
+    branches:
+      - delivery/jarvis-ai-complete-2026-10-10
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  voice-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile original Gemini Live, GUI, F5, XTTS and local WAV support
+        run: python -m py_compile main.py ui.py actions/f5_hungarian.py actions/jarvis_voice.py actions/voice_reference.py
+      - name: Install lightweight contract test runner (no user voice or models)
+        run: python -m pip install -q pytest
+      - name: Run synthetic private voice and Gemini routing contracts
+        run: python -m pytest -q tests/test_f5_hungarian.py tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py tests/test_voice_doctor.py tests/test_prepare_xtts_model.py tests/test_voice_test_local.py tests/test_voice_qt_workers.py
