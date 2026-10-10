@@ -28,7 +28,7 @@ if platform.system() == "Windows":
 
 from PyQt6.QtCore import (
     QEasingCurve, QEvent, QPoint, QPointF, QRectF, QSize, Qt,
-    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication, QThread,
+    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication, QObject,
 )
 from PyQt6.QtGui import (
     QAction, QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
@@ -10363,8 +10363,38 @@ class SettingsHubPage(QWidget):
         lay.addLayout(cards_lay)
         lay.addStretch(2)
 
-class HungarianVoiceImportWorker(QThread):
-    """Convert selected local audio without blocking the GUI or uploading data."""
+class _DaemonVoiceWorker(QObject):
+    """Run potentially long XTTS/FFmpeg work without blocking app shutdown."""
+
+    finished = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._worker_thread = None
+
+    def start(self):
+        if self.isRunning():
+            return
+        self._worker_thread = threading.Thread(
+            target=self._run_and_finish, daemon=True, name="jarvis-private-voice"
+        )
+        self._worker_thread.start()
+
+    def isRunning(self):
+        return self._worker_thread is not None and self._worker_thread.is_alive()
+
+    def _run_and_finish(self):
+        try:
+            self.run()
+        finally:
+            try:
+                self.finished.emit()
+            except RuntimeError:
+                pass  # Parent window may have been closed during model loading.
+
+
+class HungarianVoiceImportWorker(_DaemonVoiceWorker):
+    """Local FFmpeg conversion with no upload, safely detached on GUI exit."""
 
     completed = pyqtSignal(bool, str)
 
@@ -10377,17 +10407,21 @@ class HungarianVoiceImportWorker(QThread):
         try:
             from actions.voice_reference import prepare_reference
             prepare_reference(self._source, start_seconds=self._start_seconds)
-            self.completed.emit(True, "Helyi referencia sikeresen előkészítve (25 s PCM WAV).")
+            result = (True, "Helyi referencia sikeresen előkészítve (25 s PCM WAV).")
         except Exception as exc:
             from actions.voice_reference import ReferencePreparationError
             if isinstance(exc, ReferencePreparationError):
-                self.completed.emit(False, str(exc))
+                result = (False, str(exc))
             else:
-                self.completed.emit(False, "A hangminta helyi előkészítése sikertelen.")
+                result = (False, "A hangminta helyi előkészítése sikertelen.")
+        try:
+            self.completed.emit(*result)
+        except RuntimeError:
+            pass
 
 
-class HungarianVoiceTestWorker(QThread):
-    """Run a voice test outside the Qt UI thread; no reference data leaves disk."""
+class HungarianVoiceTestWorker(_DaemonVoiceWorker):
+    """Asynchronous Hungarian speech without UI freezes or Qt thread crashes."""
 
     completed = pyqtSignal(bool)
 
@@ -10400,7 +10434,10 @@ class HungarianVoiceTestWorker(QThread):
             )
         except Exception:
             pass
-        self.completed.emit(ok)
+        try:
+            self.completed.emit(ok)
+        except RuntimeError:
+            pass
 
 
 class SystemConnectivityPage(QWidget):
