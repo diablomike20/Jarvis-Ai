@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 cwd = os.path.abspath(os.getcwd())
 
@@ -22,14 +23,16 @@ a = Analysis(
         (os.path.join(cwd, 'workspace_store.py'), '.'),
         (os.path.join(cwd, 'README.md'), '.'),
         (os.path.join(cwd, 'requirements.txt'), '.'),
-        (os.path.join(cwd, 'version.txt'), '.')
+        (os.path.join(cwd, 'version.txt'), '.'),
+        *collect_data_files('imageio_ffmpeg', includes=['binaries/*']),
     ],
     hiddenimports=[
         'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'google.generativeai', 'PyQt6', 'PyQt6.QtWebEngineCore',
         'PyQt6.QtWebEngineWidgets', 'PyQt6.QtWebChannel', 'pyautogui', 'sounddevice',
         'keyboard', 'docx', 'pptx', 'multipart', 'passlib', 'bcrypt', 'aiohttp', 'websockets',
         'uvicorn', 'fastapi', 'plyer', 'pydantic', 'typing_extensions', 'requests', 'beautifulsoup4',
-        'pyaudio', 'numpy'
+        'pyaudio', 'numpy', 'torch', 'torchaudio', 'soundfile', 'imageio_ffmpeg',
+        'huggingface_hub', *collect_submodules('f5_tts'), *collect_submodules('TTS')
     ],
     hookspath=[],
     hooksconfig={},
