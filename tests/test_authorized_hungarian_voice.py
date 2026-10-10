@@ -206,3 +206,39 @@ def test_queue_rechecks_user_opt_in_before_synthesis(reference, monkeypatch):
     monkeypatch.setattr(jarvis_voice, "_load_model", forbidden_model)
     assert jarvis_voice.speak_authorized_hungarian("A felhasználó kikapcsolta a hangot.") is False
     assert calls["loads"] >= 2
+
+
+def test_stop_cancels_queued_xtts_without_playing_fallback(reference, monkeypatch):
+    """A STOP during waiting lock cancels future synthesis, not Edge fallback."""
+    set_enabled(monkeypatch, True)
+    calls = fake_winsound(monkeypatch)
+
+    def forbidden_model():
+        raise AssertionError("Queued voice must not load a model after STOP")
+    monkeypatch.setattr(jarvis_voice, "_load_model", forbidden_model)
+
+    class InterruptingLock:
+        def __enter__(self):
+            jarvis_voice.stop_authorized_hungarian()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(jarvis_voice, "_speech_lock", InterruptingLock())
+    assert jarvis_voice.speak_authorized_hungarian("Késleltetett, már törölt mondat.") is True
+    assert all(path is None for path, flags in calls)
+
+
+def test_stop_invalidates_only_prior_requests(reference, monkeypatch):
+    """STOP before invoking a NEW request must not permanently mute JARVIS."""
+    set_enabled(monkeypatch, True)
+    calls = fake_winsound(monkeypatch)
+    jarvis_voice.stop_authorized_hungarian()
+
+    class FakeXTTS:
+        def tts_to_file(self, **kwargs):
+            make_wav(Path(kwargs["file_path"]), seconds=0.05)
+
+    monkeypatch.setattr(jarvis_voice, "_load_model", lambda: FakeXTTS())
+    assert jarvis_voice.speak_authorized_hungarian("Új kérés.") is True
+    assert any(path is not None for path, flags in calls)
