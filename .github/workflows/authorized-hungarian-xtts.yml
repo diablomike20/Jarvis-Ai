@@ -21,6 +21,11 @@ jobs:
           python -m py_compile actions/jarvis_voice.py actions/voice_reference.py actions/attention_monitor.py main.py ui.py
       - name: Install test runner only (no XTTS model or voice data)
         run: python -m pip install -q pytest
+      - name: Provide FFmpeg in CI for synthetic local conversion test
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y ffmpeg
+          ffmpeg -version | head -n 1
       - name: Run synthetic WAV and routing regression tests
         run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py
 
