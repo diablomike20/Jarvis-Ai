@@ -3935,6 +3935,32 @@ class BrahmaLive:
         if not text:
             return
 
+        # All spoken announcements use the user's authorized local voice if
+        # enabled, even while Gemini Live is connected. Gemini continues to
+        # reason and listen; speech output is replaced locally.
+        try:
+            from actions.jarvis_voice import voice_readiness
+            status = voice_readiness()
+            use_custom_voice = bool(status["enabled"] and status["can_enable"])
+        except Exception:
+            use_custom_voice = False
+        if use_custom_voice:
+            def _speak_private():
+                try:
+                    self.set_speaking(True)
+                    from actions.jarvis_voice import speak_authorized_hungarian
+                    if not speak_authorized_hungarian(text):
+                        from actions.attention_monitor import _speak_edge_native
+                        _speak_edge_native(text)
+                except Exception as exc:
+                    print("[JARVIS Voice] Private speech error:", type(exc).__name__)
+                finally:
+                    self.set_speaking(False)
+            threading.Thread(
+                target=_speak_private, daemon=True, name="jarvis-authorized-voice"
+            ).start()
+            return
+
         if self.session and self._loop:
             # Route text through Gemini Live API for the unified native Charon voice
             import asyncio
@@ -4976,14 +5002,9 @@ class BrahmaLive:
         print("[BRAHMA EVO] 👂 Recv started")
         out_buf, in_buf = [], []
         buffered_gemini_pcm = []
-        try:
-            from actions.jarvis_voice import voice_readiness
-            voice_status = voice_readiness()
-            use_local_voice = bool(voice_status["enabled"] and voice_status["can_enable"])
-            if use_local_voice:
-                self.ui.write_log("SYS: Gemini Live + JARVIS helyi egyedi magyar hang bekapcsolva.")
-        except Exception:
-            use_local_voice = False
+        # Re-evaluate at the START of each Gemini reply, not once per session:
+        # the user can enable/change the voice in Settings without restarting.
+        turn_local_voice = None
 
         try:
             while True:
@@ -4994,7 +5015,16 @@ class BrahmaLive:
                             self._resume_handle = _sru.new_handle
 
                     if response.data:
-                        if use_local_voice:
+                        if turn_local_voice is None:
+                            try:
+                                from actions.jarvis_voice import voice_readiness
+                                voice_status = voice_readiness()
+                                turn_local_voice = bool(
+                                    voice_status["enabled"] and voice_status["can_enable"]
+                                )
+                            except Exception:
+                                turn_local_voice = False
+                        if turn_local_voice:
                             buffered_gemini_pcm.append(response.data)
                         else:
                             self.set_speaking(True)
@@ -5042,7 +5072,7 @@ class BrahmaLive:
                             # handling and microphone recognition. Its audio is
                             # buffered only when the user has explicitly enabled
                             # a ready private local F5 / XTTS voice.
-                            if use_local_voice:
+                            if turn_local_voice:
                                 original_pcm = tuple(buffered_gemini_pcm)
                                 buffered_gemini_pcm.clear()
                                 if full_out:
@@ -5076,6 +5106,9 @@ class BrahmaLive:
                                     for audio in original_pcm:
                                         self.audio_in_queue.put_nowait(audio)
                                     self.audio_in_queue.put_nowait(None)
+
+                            turn_local_voice = None
+                            buffered_gemini_pcm.clear()
 
                             if full_in and len(full_in) > 5:
                                 threading.Thread(
