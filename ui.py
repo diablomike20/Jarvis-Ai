@@ -28,7 +28,7 @@ if platform.system() == "Windows":
 
 from PyQt6.QtCore import (
     QEasingCurve, QEvent, QPoint, QPointF, QRectF, QSize, Qt,
-    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication,
+    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication, QObject,
 )
 from PyQt6.QtGui import (
     QAction, QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
@@ -1466,6 +1466,7 @@ def _default_app_settings() -> dict:
         "attention_call_prompts": True,
         "developer_mode_enabled": False,
         "developer_mode_workspace": "",
+        "jarvis_voice_enabled": False,
     }
 
 
@@ -10362,6 +10363,83 @@ class SettingsHubPage(QWidget):
         lay.addLayout(cards_lay)
         lay.addStretch(2)
 
+class _DaemonVoiceWorker(QObject):
+    """Run potentially long XTTS/FFmpeg work without blocking app shutdown."""
+
+    finished = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._worker_thread = None
+
+    def start(self):
+        if self.isRunning():
+            return
+        self._worker_thread = threading.Thread(
+            target=self._run_and_finish, daemon=True, name="jarvis-private-voice"
+        )
+        self._worker_thread.start()
+
+    def isRunning(self):
+        return self._worker_thread is not None and self._worker_thread.is_alive()
+
+    def _run_and_finish(self):
+        try:
+            self.run()
+        finally:
+            try:
+                self.finished.emit()
+            except RuntimeError:
+                pass  # Parent window may have been closed during model loading.
+
+
+class HungarianVoiceImportWorker(_DaemonVoiceWorker):
+    """Local FFmpeg conversion with no upload, safely detached on GUI exit."""
+
+    completed = pyqtSignal(bool, str)
+
+    def __init__(self, source: str, start_seconds: int, parent=None):
+        super().__init__(parent)
+        self._source = source
+        self._start_seconds = start_seconds
+
+    def run(self):
+        try:
+            from actions.voice_reference import prepare_reference
+            prepare_reference(self._source, start_seconds=self._start_seconds)
+            result = (True, "Helyi referencia sikeresen előkészítve (25 s PCM WAV).")
+        except Exception as exc:
+            from actions.voice_reference import ReferencePreparationError
+            if isinstance(exc, ReferencePreparationError):
+                result = (False, str(exc))
+            else:
+                result = (False, "A hangminta helyi előkészítése sikertelen.")
+        try:
+            self.completed.emit(*result)
+        except RuntimeError:
+            pass
+
+
+class HungarianVoiceTestWorker(_DaemonVoiceWorker):
+    """Asynchronous Hungarian speech without UI freezes or Qt thread crashes."""
+
+    completed = pyqtSignal(bool)
+
+    def run(self):
+        ok = False
+        try:
+            from actions.jarvis_voice import speak_authorized_hungarian
+            ok = speak_authorized_hungarian(
+                "Üdvözöllek! Itt JARVIS. A magyar hangrendszer tesztelése folyamatban."
+            )
+        except Exception:
+            pass
+        try:
+            self.completed.emit(ok)
+        except RuntimeError:
+            pass
+
+
 class SystemConnectivityPage(QWidget):
     def __init__(self, controller=None, parent=None):
         super().__init__(parent)
@@ -11265,6 +11343,35 @@ class SystemConnectivityPage(QWidget):
         tools_row.addWidget(undo_btn)
         alay.addLayout(tools_row)
 
+        # Live JARVIS XTTS control — opt-in, user-local reference, no auto-download.
+        voice_card = self._card(
+            "JARVIS magyar hang (helyi XTTS-v2)",
+            "A hangminta csak a saját gépeden marad. Az XTTS csak külön engedéllyel "
+            "és érvényes helyi PCM WAV referencia esetén kapcsolható be."
+        )
+        vlay = voice_card.layout()
+        self._hu_voice_enabled_btn = self._mk_toggle(
+            "Magyar XTTS hang engedélyezése",
+            False,
+            self._on_hu_voice_toggled,
+        )
+        vlay.addWidget(self._hu_voice_enabled_btn)
+        self._hu_voice_status_lbl = QLabel("")
+        self._hu_voice_status_lbl.setWordWrap(True)
+        self._hu_voice_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
+        vlay.addWidget(self._hu_voice_status_lbl)
+        self._hu_voice_setup_btn = QPushButton("Magyar hangmotor előkészítése (Windows)")
+        self._hu_voice_setup_btn.clicked.connect(self._launch_hu_voice_setup)
+        vlay.addWidget(self._hu_voice_setup_btn)
+        self._hu_voice_import_btn = QPushButton("Helyi MP3/WAV hangminta kiválasztása")
+        self._hu_voice_import_btn.clicked.connect(self._import_hu_voice_reference)
+        vlay.addWidget(self._hu_voice_import_btn)
+        self._hu_voice_test_btn = QPushButton("Magyar hang kipróbálása")
+        self._hu_voice_test_btn.clicked.connect(self._test_hu_voice)
+        vlay.addWidget(self._hu_voice_test_btn)
+        alay.addWidget(voice_card)
+        self._refresh_hu_voice_controls()
+
         self._audio_status_lbl = QLabel("Hardware audio deduplication, echo guard and undo stack active.")
         self._audio_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
         alay.addWidget(self._audio_status_lbl)
@@ -11274,6 +11381,195 @@ class SystemConnectivityPage(QWidget):
         lay.addStretch(1)
         return col
 
+
+    def _refresh_hu_voice_controls(self):
+        from actions.jarvis_voice import voice_readiness
+        status = voice_readiness()
+        self._hu_voice_enabled_btn.blockSignals(True)
+        try:
+            self._hu_voice_enabled_btn.setChecked(bool(status["enabled"]))
+        finally:
+            self._hu_voice_enabled_btn.blockSignals(False)
+        import_running = bool(
+            getattr(self, "_hu_voice_import_worker", None)
+            and self._hu_voice_import_worker.isRunning()
+        )
+        self._hu_voice_status_lbl.setText(str(status["reason"]))
+        self._hu_voice_enabled_btn.setEnabled(not import_running)
+        self._hu_voice_import_btn.setEnabled(not import_running)
+        self._hu_voice_test_btn.setEnabled(
+            bool(status["enabled"] and status["can_enable"])
+            and not import_running
+            and not (getattr(self, "_hu_voice_worker", None)
+                     and self._hu_voice_worker.isRunning())
+        )
+
+    def _launch_hu_voice_setup(self):
+        """Open explicitly approved dependency/model setup in a visible console."""
+        if platform.system() != "Windows":
+            QMessageBox.information(self, "Magyar XTTS", "A hangmotor csak Windows alatt telepíthető.")
+            return
+        script = BASE_DIR / "scripts" / "setup_hungarian_voice.ps1"
+        venvs = (
+            BASE_DIR / ".venv" / "Scripts" / "python.exe",
+            BASE_DIR / "venv" / "Scripts" / "python.exe",
+        )
+        if not script.is_file() or not any(path.is_file() for path in venvs):
+            QMessageBox.warning(
+                self, "JARVIS Python környezet hiányzik",
+                "A beüzemelő a fejlesztői JARVIS telepítéshez és annak "
+                "meglévő Python .venv környezetéhez készült. "
+                "Először készítsd elő a fő alkalmazást.",
+            )
+            return
+        choice = QMessageBox.question(
+            self, "Magyar XTTS hangmotor beüzemelése",
+            "Telepíthető az FFmpeg, a Coqui és a PyTorch a meglévő JARVIS Python "
+            "környezetbe. Ez internetet és jelentős tárhelyet használhat; "
+            "az alapértelmezett Torch CPU-verzió. A modell letöltése és "
+            "licencelfogadása egy külön látható PowerShell-ablakban történik. "
+            "Az engedélyezett privát hangminta NEM kerül feltöltésre.\n\n"
+            "Elindítod a telepítést?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            import subprocess
+            subprocess.Popen(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-NoExit", "-File", str(script),
+                    "-Install", "-InstallFFmpeg", "-PrepareModel",
+                ],
+                cwd=str(BASE_DIR),
+                creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+            )
+        except Exception:
+            QMessageBox.warning(
+                self, "Beüzemelési hiba",
+                "A helyi telepítő nem indult el. "
+                "Indítsd manuálisan a scripts/setup_hungarian_voice.ps1 fájlt.",
+            )
+            return
+        self._hu_voice_status_lbl.setText(
+            "A hangmotor telepítője külön PowerShell-ablakban elindult. "
+            "A licencfeltételeket ott külön hagyd jóvá, majd frissítsd a beállításokat."
+        )
+
+    def _import_hu_voice_reference(self):
+        """Explicit local-only import; the selected voice must be authorized."""
+        if getattr(self, "_hu_voice_import_worker", None) and self._hu_voice_import_worker.isRunning():
+            return
+        source, _ = QFileDialog.getOpenFileName(
+            self, "Engedélyezett helyi hangminta kiválasztása", "",
+            "Audio fájl (*.mp3 *.wav)"
+        )
+        if not source:
+            return
+        start, ok = QInputDialog.getInt(
+            self, "Referencia-részlet kiválasztása",
+            "Hányadik másodperctől kezdődjön a 25 másodperces részlet? "
+            "(Válassz egyetlen beszélőt tartalmazó, tiszta szakaszt.)",
+            0, 0, 3600, 1
+        )
+        if not ok:
+            return
+        approved = QMessageBox.question(
+            self, "Privát magyar hangreferencia",
+            "Igazolod, hogy rendelkezel a kiválasztott hang megfelelő "
+            "AI beszédszintézisre szóló felhasználási engedélyével?\n\n"
+            "A kiválasztott részlet kizárólag helyben, FFmpeg segítségével "
+            "alakul PCM WAV-fájllá a saját felhasználói könyvtárban. "
+            "A korábbi helyi referencia felülíródik. Nem történik feltöltés.\n\n"
+            "Folytatod?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if approved != QMessageBox.StandardButton.Yes:
+            return
+        self._hu_voice_status_lbl.setText("Helyi referencia előkészítése folyamatban…")
+        worker = HungarianVoiceImportWorker(source, start, self)
+        self._hu_voice_import_worker = worker
+        worker.completed.connect(self._on_hu_voice_import_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+        self._refresh_hu_voice_controls()
+        self._hu_voice_status_lbl.setText("A hangminta helyi feldolgozása folyamatban…")
+
+    def _on_hu_voice_import_completed(self, ok: bool, message: str):
+        self._hu_voice_import_worker = None
+        self._refresh_hu_voice_controls()
+        if not ok:
+            self._hu_voice_status_lbl.setText(message)
+        elif os.environ.get("JARVIS_VOICE_REFERENCE", "").strip():
+            self._hu_voice_status_lbl.setText(
+                "A WAV elkészült, de a JARVIS_VOICE_REFERENCE környezeti "
+                "változó felülírja az alapértelmezett referencia kiválasztását."
+            )
+        else:
+            self._hu_voice_status_lbl.setText(message)
+
+    def _on_hu_voice_toggled(self, enabled: bool):
+        from actions.jarvis_voice import voice_readiness
+        from memory import config_manager
+        if enabled:
+            status = voice_readiness()
+            if not status["can_enable"]:
+                QMessageBox.warning(self, "Magyar XTTS nem használható",
+                                    str(status["reason"]) + "\\n\\n"
+                                    "A helyi referencia és a függőségek előkészítése szükséges.")
+                self._refresh_hu_voice_controls()
+                return
+            result = QMessageBox.question(
+                self, "Magyar hang engedélyezése",
+                "Megerősíted, hogy jogosult vagy a helyi referenciahang "
+                "AI beszédszintézisre történő használatára?\\n\\n"
+                "Az XTTS első hangpróbája a modell letöltésével és a modelllicenc "
+                "elfogadásával járhat. A referenciahang nem kerül felhőbe.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                self._refresh_hu_voice_controls()
+                return
+        try:
+            config_manager.set_setting("jarvis_voice_enabled", bool(enabled))
+            # config_manager currently catches disk errors internally; verify persistence.
+            if config_manager.get_setting("jarvis_voice_enabled") is not bool(enabled):
+                raise OSError("Voice setting was not persisted")
+            if not enabled:
+                from actions.jarvis_voice import stop_authorized_hungarian
+                stop_authorized_hungarian()
+        except Exception:
+            QMessageBox.warning(self, "Beállítási hiba",
+                                "A hangbeállítást nem sikerült elmenteni.")
+        self._refresh_hu_voice_controls()
+
+    def _test_hu_voice(self):
+        from actions.jarvis_voice import is_configured, voice_readiness
+        if not is_configured() or not voice_readiness()["can_enable"]:
+            self._refresh_hu_voice_controls()
+            return
+        if getattr(self, "_hu_voice_worker", None) and self._hu_voice_worker.isRunning():
+            return
+        self._hu_voice_status_lbl.setText("Magyar hangpróba folyamatban…")
+        self._hu_voice_test_btn.setEnabled(False)
+        worker = HungarianVoiceTestWorker(self)
+        self._hu_voice_worker = worker
+        worker.completed.connect(self._on_hu_voice_test_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def _on_hu_voice_test_completed(self, ok: bool):
+        self._hu_voice_worker = None
+        self._refresh_hu_voice_controls()
+        if not ok:
+            self._hu_voice_status_lbl.setText(
+                "Hangpróba sikertelen. Ellenőrizd az XTTS telepítését és "
+                "a modell licencelfogadását. A rendszer többi hangja megmarad."
+            )
 
     def _on_input_device_changed(self, name: str):
         try:
@@ -12436,6 +12732,8 @@ class SystemConnectivityPage(QWidget):
             self._ctrl().write_log("SYS: Update check requested.")
 
     def refresh(self):
+        if hasattr(self, "_hu_voice_enabled_btn"):
+            self._refresh_hu_voice_controls()
         api = self._load_api_defaults()
         app = self._load_app_settings()
         discord = self._load_discord_settings()

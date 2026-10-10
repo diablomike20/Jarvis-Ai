@@ -70,3 +70,8 @@ gradle-8.7-bin.zip
 setup_android_sdk.ps1
 build_apk.ps1
 process_logo.py
+
+# Private speech references and generated voice output: never commit
+**/jarvis_hu_authorized.wav
+**/xtts_*.wav
+**/private_voice_samples/
