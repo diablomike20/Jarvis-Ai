@@ -11360,6 +11360,9 @@ class SystemConnectivityPage(QWidget):
         self._hu_voice_status_lbl.setWordWrap(True)
         self._hu_voice_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
         vlay.addWidget(self._hu_voice_status_lbl)
+        self._hu_voice_setup_btn = QPushButton("Magyar hangmotor előkészítése (Windows)")
+        self._hu_voice_setup_btn.clicked.connect(self._launch_hu_voice_setup)
+        vlay.addWidget(self._hu_voice_setup_btn)
         self._hu_voice_import_btn = QPushButton("Helyi MP3/WAV hangminta kiválasztása")
         self._hu_voice_import_btn.clicked.connect(self._import_hu_voice_reference)
         vlay.addWidget(self._hu_voice_import_btn)
@@ -11399,6 +11402,60 @@ class SystemConnectivityPage(QWidget):
             and not import_running
             and not (getattr(self, "_hu_voice_worker", None)
                      and self._hu_voice_worker.isRunning())
+        )
+
+    def _launch_hu_voice_setup(self):
+        """Open explicitly approved dependency/model setup in a visible console."""
+        if platform.system() != "Windows":
+            QMessageBox.information(self, "Magyar XTTS", "A hangmotor csak Windows alatt telepíthető.")
+            return
+        script = BASE_DIR / "scripts" / "setup_hungarian_voice.ps1"
+        venvs = (
+            BASE_DIR / ".venv" / "Scripts" / "python.exe",
+            BASE_DIR / "venv" / "Scripts" / "python.exe",
+        )
+        if not script.is_file() or not any(path.is_file() for path in venvs):
+            QMessageBox.warning(
+                self, "JARVIS Python környezet hiányzik",
+                "A beüzemelő a fejlesztői JARVIS telepítéshez és annak "
+                "meglévő Python .venv környezetéhez készült. "
+                "Először készítsd elő a fő alkalmazást.",
+            )
+            return
+        choice = QMessageBox.question(
+            self, "Magyar XTTS hangmotor beüzemelése",
+            "Telepíthető az FFmpeg, a Coqui és a PyTorch a meglévő JARVIS Python "
+            "környezetbe. Ez internetet és jelentős tárhelyet használhat; "
+            "az alapértelmezett Torch CPU-verzió. A modell letöltése és "
+            "licencelfogadása egy külön látható PowerShell-ablakban történik. "
+            "Az engedélyezett privát hangminta NEM kerül feltöltésre.\n\n"
+            "Elindítod a telepítést?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            import subprocess
+            subprocess.Popen(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-NoExit", "-File", str(script),
+                    "-Install", "-InstallFFmpeg", "-PrepareModel",
+                ],
+                cwd=str(BASE_DIR),
+                creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+            )
+        except Exception:
+            QMessageBox.warning(
+                self, "Beüzemelési hiba",
+                "A helyi telepítő nem indult el. "
+                "Indítsd manuálisan a scripts/setup_hungarian_voice.ps1 fájlt.",
+            )
+            return
+        self._hu_voice_status_lbl.setText(
+            "A hangmotor telepítője külön PowerShell-ablakban elindult. "
+            "A licencfeltételeket ott külön hagyd jóvá, majd frissítsd a beállításokat."
         )
 
     def _import_hu_voice_reference(self):
