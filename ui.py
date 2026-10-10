@@ -1316,8 +1316,10 @@ def qcol(h: str, a: int = 255) -> QColor:
 
 
 def _logo_icon() -> QIcon:
-    # Runtime-generated Jarvis AI badge; avoids showing historic logo artwork
-    # while keeping the old resource filenames for installation compatibility.
+    # Use the exact user-approved JARVIS.ico on the taskbar, title bar and
+    # app tray as well as inside PyInstaller's Windows EXE resources.
+    if LOGO_ICO.is_file():
+        return QIcon(str(LOGO_ICO))
     return QIcon(_logo_pixmap(128))
 
 
