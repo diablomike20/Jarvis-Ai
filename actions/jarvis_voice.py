@@ -53,12 +53,24 @@ def _valid_reference_wav(path: Path) -> bool:
         return False
 
 
+def voice_engine() -> str:
+    """Existing XTTS stays available; F5 is selected only by user preference."""
+    try:
+        from memory import config_manager
+        engine = config_manager.get_setting("jarvis_voice_engine", "xtts")
+    except Exception:
+        engine = "xtts"
+    return engine if engine in ("f5", "xtts") else "xtts"
+
+
 def is_configured() -> bool:
     """No file-presence-based auto-enablement: explicit user opt-in only."""
     try:
         from memory import config_manager
         settings = config_manager.load_settings() or {}
         if settings.get("jarvis_voice_enabled") is not True:
+            return False
+        if voice_engine() == "f5" and not str(settings.get("jarvis_f5_reference_text", "")).strip():
             return False
     except Exception:
         return False
@@ -83,28 +95,45 @@ def voice_readiness() -> dict[str, bool | str]:
     except Exception:
         enabled = False
     reference_ok = _valid_reference_wav(reference_wav_path())
-    deps = {}
-    for package in ("torch", "TTS"):
-        try:
-            deps[package] = importlib.util.find_spec(package) is not None
-        except (ImportError, ValueError, AttributeError):
-            deps[package] = False
+    engine = voice_engine()
+    if engine == "f5":
+        from actions import f5_hungarian
+        from memory import config_manager
+        deps_ok = f5_hungarian.runtime_available()
+        model_ok = f5_hungarian.assets_ready()
+        transcript_ok = bool(str(config_manager.get_setting("jarvis_f5_reference_text", "")).strip())
+    else:
+        deps = {}
+        for package in ("torch", "TTS"):
+            try:
+                deps[package] = importlib.util.find_spec(package) is not None
+            except (ImportError, ValueError, AttributeError):
+                deps[package] = False
+        deps_ok = all(deps.values())
+        model_ok = True  # XTTS downloads its public model on explicit first use.
+        transcript_ok = True
     supported = _is_windows()
-    can_enable = supported and reference_ok and all(deps.values())
+    can_enable = supported and reference_ok and deps_ok and model_ok and transcript_ok
     if not supported:
-        reason = "A magyar XTTS hang csak Windows alatt támogatott."
+        reason = "A magyar hangmotor csak Windows alatt támogatott."
     elif not reference_ok:
         reason = "Hiányzik az érvényes, engedélyezett PCM WAV referencia."
-    elif not all(deps.values()):
-        reason = "Hiányzik a torch vagy a coqui-tts (TTS) helyi függőség."
+    elif not transcript_ok:
+        reason = "Az F5 magyar hanghoz add meg a referencia pontos szöveges átiratát."
+    elif not model_ok:
+        reason = "A magyar F5 modell hiányzik. Töltsd le a beállításokban, a licenc jóváhagyásával."
+    elif not deps_ok:
+        reason = "A kiválasztott helyi hangmotor Python-függőségei hiányoznak a telepítőből."
     elif enabled:
-        reason = "Magyar XTTS bekapcsolva. Helyi hangpróba indítható."
+        reason = "A magyar egyedi hang bekapcsolva. Helyi hangpróba indítható."
     else:
-        reason = "A helyi referencia és függőségek készen állnak."
+        reason = "A magyar hangreferencia és a választott motor készen áll."
     return {
         "enabled": enabled,
         "reference_ok": reference_ok,
-        "dependencies_ok": all(deps.values()),
+        "dependencies_ok": deps_ok,
+        "model_ok": model_ok,
+        "engine": engine,
         "windows": supported,
         "can_enable": can_enable,
         "reason": reason,
@@ -180,13 +209,22 @@ def speak_authorized_hungarian(text: str) -> bool:
             ) as output:
                 output_path = Path(output.name)
 
-            _load_model().tts_to_file(
-                text=text,
-                speaker_wav=str(reference_wav_path()),
-                language=_LANGUAGE,
-                file_path=str(output_path),
-                split_sentences=True,
-            )
+            if voice_engine() == "f5":
+                from actions.f5_hungarian import synthesize_f5
+                from memory import config_manager
+                synthesize_f5(
+                    text, reference_wav_path(),
+                    str(config_manager.get_setting("jarvis_f5_reference_text", "")),
+                    output_path,
+                )
+            else:
+                _load_model().tts_to_file(
+                    text=text,
+                    speaker_wav=str(reference_wav_path()),
+                    language=_LANGUAGE,
+                    file_path=str(output_path),
+                    split_sentences=True,
+                )
             if cancel.is_set():
                 return True  # Cancelled speech must NOT trigger the fallback.
             with wave.open(str(output_path), "rb") as generated:
