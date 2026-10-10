@@ -60,13 +60,20 @@ jobs:
         shell: pwsh
         run: |
           $exe = (Resolve-Path "dist/BrahmaEvo/BrahmaEvo.exe").Path
+          $report = Join-Path $env:RUNNER_TEMP "jarvis-frozen-smoke.txt"
+          $env:JARVIS_STARTUP_SMOKE_REPORT = $report
           $proc = Start-Process -FilePath $exe -ArgumentList "--smoke-imports" -WorkingDirectory (Get-Location).Path -PassThru
-          if (-not $proc.WaitForExit(90000)) {
+          if (-not $proc.WaitForExit(60000)) {
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            if (Test-Path $report) { Get-Content $report -Tail 120 }
             throw "Frozen JARVIS import smoke timed out. EXE must work before packaging."
           }
+          if (Test-Path $report) { Get-Content $report -Tail 120 }
           if ($proc.ExitCode -ne 0) {
             throw "Frozen JARVIS import smoke failed (exit code $($proc.ExitCode)). Do not publish setup."
+          }
+          if (!(Test-Path $report) -or !(Select-String -Path $report -Pattern "JARVIS FROZEN STARTUP IMPORTS OK" -Quiet)) {
+            throw "Frozen JARVIS smoke marker missing; startup was not verified."
           }
           Write-Host "Verified: actual packaged JARVIS EXE completes its startup imports."
       - name: Find or install Inno Setup compiler
