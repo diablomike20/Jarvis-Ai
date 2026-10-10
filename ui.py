@@ -11395,9 +11395,47 @@ class SystemConnectivityPage(QWidget):
 
         lay.addWidget(audio_card)
 
+        # The true React/Three.js Orb is bundled with JARVIS; no separate app.
+        orb_card = self._card(
+            "JARVIS 3D Orb — választható élő háttér",
+            "Az új WebGL Orb közvetlenül a JARVIS hangállapotait és hangerőjelét kapja. "
+            "Az eredeti animáció változatlanul elérhető.",
+        )
+        olay = orb_card.layout()
+        from memory import config_manager
+        self._jarvis_orb_toggle = self._mk_toggle(
+            "Új JARVIS 3D Orb animáció használata",
+            bool(config_manager.get_setting("jarvis_orb_enabled", False)),
+            self._on_jarvis_orb_toggled,
+        )
+        olay.addWidget(self._jarvis_orb_toggle)
+        hint = QLabel("A háttér módosítása a következő JARVIS-indításkor lép érvénybe.")
+        hint.setWordWrap(True)
+        olay.addWidget(hint)
+        lay.addWidget(orb_card)
+
         lay.addStretch(1)
         return col
 
+
+    def _on_jarvis_orb_toggled(self, enabled: bool):
+        from memory import config_manager
+        try:
+            config_manager.set_setting("jarvis_orb_enabled", bool(enabled))
+            if config_manager.get_setting("jarvis_orb_enabled") is not bool(enabled):
+                raise OSError("Orb preference not persisted")
+        except Exception:
+            QMessageBox.warning(self, "JARVIS Orb", "A háttér választását nem sikerült elmenteni.")
+            self._jarvis_orb_toggle.blockSignals(True)
+            self._jarvis_orb_toggle.setChecked(not enabled)
+            self._jarvis_orb_toggle.blockSignals(False)
+            return
+        QMessageBox.information(
+            self, "JARVIS Orb",
+            "A következő JARVIS-indításkor az új 3D Orb animáció jelenik meg."
+            if enabled else
+            "A következő JARVIS-indításkor az eredeti animáció jelenik meg.",
+        )
 
     def _refresh_hu_voice_controls(self):
         from actions.jarvis_voice import voice_readiness
