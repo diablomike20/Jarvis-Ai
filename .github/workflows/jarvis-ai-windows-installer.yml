@@ -44,7 +44,7 @@ jobs:
           # from source on Windows. Install runtime-only inference dependencies
           # instead; the actual F5 model is only downloaded after user consent.
           Get-Content requirements.txt | Where-Object {
-            $_ -notmatch "^\\s*f5-tts\\s*(?:#.*)?$"
+            $_ -notmatch "^\s*f5-tts\s*(?:#.*)?$"
           } | Set-Content -Path requirements-windows-build.txt -Encoding utf8
           python -m pip install --prefer-binary -r requirements-windows-build.txt
           if ($LASTEXITCODE -ne 0) { throw "A required JARVIS desktop dependency could not be installed." }
