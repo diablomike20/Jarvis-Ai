@@ -28,7 +28,11 @@ a = Analysis(
         # The *real* F5 runtime opens configs/F5TTS_v1_Base.yaml via
         # importlib.resources. collect_submodules alone omits this YAML.
         *collect_data_files('f5_tts'),
-        *collect_data_files('TTS'),
+        # Coqui imports TTS.vocoder.configs.__init__ and enumerates sibling .py
+        # files with os.listdir(Path(__file__).parent). PyInstaller normally
+        # keeps .py in PYZ (not on disk), causing WinError 3 at EXE startup.
+        # Ship actual source files for the installed Coqui distribution.
+        *collect_data_files('TTS', include_py_files=True),
         # Transformers checks installed torchcodec distribution metadata at import.
         # PyInstaller does NOT copy *.dist-info automatically, despite copying
         # torchcodec's Python package; the frozen EXE crashed here in CI.

@@ -88,6 +88,17 @@ jobs:
           if ($head[0] -ne 77 -or $head[1] -ne 90) { throw "Not a Windows PE executable." }
           $files = Get-ChildItem "dist/BrahmaEvo" -Recurse -File
           if ($files.Count -lt 50) { throw "Incomplete desktop runtime bundle." }
+          # Coqui dynamically discovers vocoder configs by filesystem listing.
+          # Do not waste an installer build on a bundled source-less TTS PYZ.
+          $coquiDir = "dist/BrahmaEvo/_internal/TTS/vocoder/configs"
+          if (!(Test-Path "$coquiDir/__init__.py")) {
+            throw "Coqui vocoder configs source directory missing from frozen EXE runtime."
+          }
+          $cfgCount = @(Get-ChildItem $coquiDir -Filter "*_config.py" -File).Count
+          if ($cfgCount -lt 1) {
+            throw "Coqui vocoder config source files missing from frozen bundle."
+          }
+          Write-Host "Coqui vocoder filesystem discovery: $cfgCount physical configs verified."
           $sum = ($files | Measure-Object -Sum Length).Sum
           Write-Host "JARVIS binary bundle: $($files.Count) files, $sum bytes."
       - name: Actually run frozen JARVIS EXE startup imports on Windows
