@@ -1,0 +1,113 @@
+name: JARVIS AI full Windows installer
+
+on:
+  push:
+    branches:
+      - delivery/jarvis-ai-complete-2026-10-10
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 110
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Checkout complete integrated JARVIS tree
+        uses: actions/checkout@v4
+      - name: Set up Python 3.11 Windows x64
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+      - name: Check repository content is safe to package
+        shell: pwsh
+        run: |
+          $blocked = @('api_keys.json', 'ig_session.json', 'email_credentials.json', 'jarvis_hu_authorized.wav')
+          foreach ($name in $blocked) {
+            $matches = @(git ls-files | Where-Object { $_.Replace('\','/') -match ('(^|/)' + [regex]::Escape($name) + '$') })
+            if ($matches.Count -gt 0) { throw "Found blocked private file in tracked source." }
+          }
+          Write-Host "Private secrets and voice reference files are absent from tracked sources."
+      - name: Install real JARVIS runtime and Windows packager
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --prefer-binary -r requirements.txt
+          python -m pip install --prefer-binary "pyinstaller>=6.11,<7" pywin32 google-genai keyboard passlib bcrypt aiohttp websockets plyer
+      - name: Compile full JARVIS desktop application (PyInstaller)
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean installer/BrahmaEvo.spec
+          if ($LASTEXITCODE -ne 0) { throw "Real desktop EXE compilation failed." }
+          if (!(Test-Path "dist/BrahmaEvo/BrahmaEvo.exe")) { throw "Missing built desktop executable." }
+      - name: Verify compiled PE and essential runtime resources
+        shell: pwsh
+        run: |
+          $exe = "dist/BrahmaEvo/BrahmaEvo.exe"
+          $head = [System.IO.File]::ReadAllBytes((Resolve-Path $exe).Path)[0..1]
+          if ($head[0] -ne 77 -or $head[1] -ne 90) { throw "Not a Windows PE executable." }
+          $files = Get-ChildItem "dist/BrahmaEvo" -Recurse -File
+          if ($files.Count -lt 50) { throw "Incomplete desktop runtime bundle." }
+          $sum = ($files | Measure-Object -Sum Length).Sum
+          Write-Host "JARVIS binary bundle: $($files.Count) files, $sum bytes."
+      - name: Find or install Inno Setup compiler
+        shell: pwsh
+        run: |
+          $candidates = @(
+            (Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "Cannot locate Inno Setup ISCC.exe." }
+          "ISCC=$iscc" >> $env:GITHUB_ENV
+      - name: Compile genuine JARVIS AI Windows Setup EXE
+        shell: pwsh
+        run: |
+          & "$env:ISCC" installer/JARVIS_AI_Windows.iss
+          if ($LASTEXITCODE -ne 0) { throw "Windows installer compilation failed." }
+          if (!(Test-Path "dist/installer/JARVIS_AI_Setup_Windows_x64.exe")) { throw "Missing setup EXE." }
+      - name: Produce release checksums and proof of build
+        shell: pwsh
+        run: |
+          $setup = "dist/installer/JARVIS_AI_Setup_Windows_x64.exe"
+          $app = "dist/BrahmaEvo/BrahmaEvo.exe"
+          $report = @(
+            "JARVIS AI / Windows x64 build"
+            "Commit: $env:GITHUB_SHA"
+            "Setup SHA256: $((Get-FileHash $setup -Algorithm SHA256).Hash)"
+            "App SHA256: $((Get-FileHash $app -Algorithm SHA256).Hash)"
+            "Model weights: NOT included (license + user consent)"
+            "Private voice references: NOT included"
+            "Status: Compiled PE + installer; physical machine GUI and XTTS sound still need verification"
+          )
+          $report | Set-Content -Path dist/installer/BUILD_INFO.txt -Encoding UTF8
+          Get-Item $setup, $app | Select-Object FullName,Length | Format-Table -AutoSize
+      - name: Upload one-click Windows Setup executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS_AI_SETUP_WINDOWS_X64
+          path: |
+            dist/installer/JARVIS_AI_Setup_Windows_x64.exe
+            dist/installer/BUILD_INFO.txt
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Upload portable Windows desktop application
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS_AI_PORTABLE_WINDOWS_X64
+          path: dist/BrahmaEvo/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 1
