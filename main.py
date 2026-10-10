@@ -5550,6 +5550,11 @@ if __name__ == "__main__":
             "workspace_store",
             "actions.jarvis_voice",
             "actions.voice_reference",
+            "actions.f5_hungarian",
+            "f5_tts.api",
+            "TTS.api",
+            "imageio_ffmpeg",
+            "soundfile",
             "memory.config_manager",
         ):
             importlib.import_module(module_name)
