@@ -10436,7 +10436,7 @@ class HungarianVoiceImportWorker(_DaemonVoiceWorker):
         try:
             from actions.voice_reference import prepare_reference
             prepare_reference(self._source, start_seconds=self._start_seconds)
-            result = (True, "Helyi referencia sikeresen előkészítve (25 s PCM WAV).")
+            result = (True, "Helyi referencia sikeresen előkészítve (12 s PCM WAV).")
         except Exception as exc:
             from actions.voice_reference import ReferencePreparationError
             if isinstance(exc, ReferencePreparationError):
@@ -11547,7 +11547,7 @@ class SystemConnectivityPage(QWidget):
             return
         start, ok = QInputDialog.getInt(
             self, "Referencia-részlet kiválasztása",
-            "Hányadik másodperctől kezdődjön a 25 másodperces részlet? "
+            "Hányadik másodperctől kezdődjön a 12 másodperces részlet? "
             "(Válassz egyetlen beszélőt tartalmazó, tiszta szakaszt.)",
             0, 0, 3600, 1
         )
