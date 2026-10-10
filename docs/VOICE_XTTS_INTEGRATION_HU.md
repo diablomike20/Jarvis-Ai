@@ -169,3 +169,60 @@ használnak. Windows alatt is ellenőrzik a kód és az útvonalak
 kompatibilitását, de **nem végeznek valódi XTTS modellfuttatást**.
 A forrásban a hangminta, a személyes adatok és a modellfájlok továbbra
 sem szerepelnek.
+
+
+## 2026-10-10 — Windows célszámítógépes indítás előkészítése
+
+**Ne a CI-ban, hanem a saját Windows-gépen, a JARVIS-hoz tartozó
+Python-környezetben** futtasd az alábbi lépéseket. Az ellenőrzőprogram
+nem olvassa ki a referencia hangját, nem indít AI-modellt, és nem tölti fel
+a fájlt sehova. A kimenetből a személyes hangútvonalakat kihagyja.
+
+A projekt gyökérkönyvtárából:
+
+~~~powershell
+python scripts/voice_doctor.py --json
+python scripts/voice_doctor.py --probe-runtime
+~~~
+
+A második parancs a **telepített PyTorch és Coqui TTS Python importját**
+is megpróbálja, GPU-t jelez, de nem tölti be a modellt és nem generál
+hangot. Az FFmpeg ellenőrzése csak azt jelzi, hogy elérhető-e a PATH-on.
+Ha hiányzik a Torch, Torchaudio vagy Coqui, a hivatalos telepítési
+útmutató alapján, **ugyanabba a Python-környezetbe** telepítsd. Nem
+telepítünk automatikusan semmit:
+
+https://coqui-tts.readthedocs.io/en/latest/installation.html
+
+Amennyiben a modell nincs helyben gyorsítótárazva, az XTTS-v2 első
+GUI-hangpróbája letöltési/licenckérdéssel akadhat el a háttérben.
+Ezért célszerűbb az **egyértelműen kezdeményezett, interaktív** betöltés
+a terminálban, saját elfogadásoddal:
+
+~~~powershell
+python scripts/prepare_xtts_model.py --download
+~~~
+
+**Ez a parancs internetet használhat a nyilvános Coqui XTTS-v2
+modell letöltéséhez**, és elfogadandó licencfeltételeket mutathat.
+A licencet a felhasználó kezeli, a parancs nem fogadja el helyette.
+A privát referenciahangot egyáltalán nem olvassa be; kizárólag a
+nyilvános modellt próbálja előkészíteni. A parancs külön
+\`--download\` kapcsoló nélkül nem tölt modellt.
+
+Utána a JARVIS grafikus felületén a Settings → System & Connectivity →
+Audio Routing & Hardware Controls részben importáld a helyi
+MP3/WAV-ot, kapcsold be a magyar XTTS-t, és próbáld ki a gombbal.
+A modell cache-nek a JARVIS futtatását végző ugyanazon felhasználó
+környezetében kell lennie.
+
+**Visszaállás:** kapcsold ki a magyar XTTS-hangot; a régi SAPI/Edge
+beszédútvonal megmarad. A STOP már a várakozó, még el nem kezdett XTTS
+kéréseket is megszakítja. Az opcionális hangpróba és helyi
+hangkonverzió daemon háttérszálon fut, ezért nem tartja fogva a
+program bezárását, de egy már elindult FFmpeg- vagy XTTS-modellművelet
+az operációs rendszeren belül még befejeződhet.
+
+**Továbbra sincs igazolva**: valódi Win10/11 GUI + PyTorch CUDA,
+XTTS-v2 modellbetöltés és kiejtés, privát referenciahang használatával
+végzett sikeres beszéd, illetve teljes STT→AI→TTS E2E.
