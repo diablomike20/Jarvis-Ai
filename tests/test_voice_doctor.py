@@ -70,3 +70,37 @@ def test_main_does_not_load_model(monkeypatch, capsys):
     monkeypatch.setattr(jarvis_voice, "_load_model", forbidden_model)
     assert doctor.main(["--json"]) == 0
     assert "xtts_runtime_plausible" in capsys.readouterr().out
+
+
+def test_runtime_probe_reports_errors_by_type_not_private_paths(monkeypatch):
+    class FakeTorch:
+        class cuda:
+            @staticmethod
+            def is_available():
+                return True
+
+    def fake_import(name):
+        if name == "torch":
+            return FakeTorch()
+        raise RuntimeError("private home C:/Users/Personal/Secret")
+
+    monkeypatch.setattr(doctor.importlib, "import_module", fake_import)
+    result = doctor.probe_runtime_imports()
+    assert result["torch_import_ok"] is True
+    assert result["cuda_available"] is True
+    assert result["coqui_api_import_ok"] is False
+    assert result["coqui_error_type"] == "RuntimeError"
+    assert "Personal" not in str(result)
+
+
+def test_strict_runtime_probe_rejects_broken_imports(monkeypatch, capsys):
+    monkeypatch.setattr(doctor, "voice_readiness",
+                        lambda: _status(enabled=True, wav=True, packages=True))
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(doctor, "probe_runtime_imports",
+                        lambda: {"torch_import_ok": True,
+                                 "coqui_api_import_ok": False,
+                                 "cuda_available": False})
+    assert doctor.main(["--strict", "--json", "--probe-runtime"]) == 2
+    report = json.loads(capsys.readouterr().out)
+    assert report["runtime_import_probe"]["coqui_api_import_ok"] is False
