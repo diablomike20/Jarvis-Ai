@@ -5207,10 +5207,21 @@ class BrahmaLive:
         except Exception:
             pass
 
-        client = genai.Client(
-            api_key=_get_api_key(),
-            http_options={"api_version": "v1beta"}
-        )
+        try:
+            client = genai.Client(
+                api_key=_get_api_key(),
+                http_options={"api_version": "v1beta"}
+            )
+        except Exception as exc:
+            # Without the Gemini key an idle GUI used to incorrectly display
+            # LISTENING although no microphone session had ever started.
+            self.ui.write_log(
+                "ERR: Gemini Live nem indul: hiányzó vagy hibás Gemini API-kulcs. "
+                "Ellenőrizd a JARVIS Settings > API beállításokat; utána indítsd újra."
+            )
+            print("[JARVIS Gemini] Client init failed:", type(exc).__name__)
+            self.ui.set_state("IDLE")
+            return
 
         while True:
             try:
@@ -5267,15 +5278,22 @@ class BrahmaLive:
                         pass
                     
             except Exception as e:
-                print(f"[BRAHMA EVO] ⚠️ {e}")
+                print("[JARVIS Gemini] Live error:", type(e).__name__)
                 traceback.print_exc()
+                self.ui.write_log(
+                    "ERR: Gemini Live nincs kapcsolódva ("
+                    + type(e).__name__
+                    + "). Újracsatlakozás folyamatban; a mikrofon most NEM figyel."
+                )
                 if _is_gemini_limit_error(e):
                     self._use_openrouter_first = True
                 self.session = None
                 self._loop = None
             self.set_speaking(False)
-            self.ui.set_state("LISTENING")
-            print("[BRAHMA EVO] 🔄 Reconnecting in 5s...")
+            # Never display a false 'LISTENING' status after the cloud audio
+            # session disconnects. The next loop attempt sets THINKING.
+            self.ui.set_state("IDLE")
+            print("[JARVIS Gemini] Reconnecting in 5s...")
             await asyncio.sleep(5)
 
 def main():
