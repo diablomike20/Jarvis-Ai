@@ -117,3 +117,19 @@ def test_private_voice_workers_do_not_outlive_qthread_shutdown():
     assert "daemon=True" in core
     assert "threading.Thread(" in core
     assert "self.finished.emit()" in core
+
+
+def test_runtime_setup_in_real_audio_settings_is_explicitly_approved():
+    source = (Path(__file__).resolve().parents[1] / "ui.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "SystemConnectivityPage")
+    method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "_launch_hu_voice_setup")
+    body = ast.get_source_segment(source, method)
+    assert "QMessageBox.question(" in body
+    assert "StandardButton.Yes" in body
+    assert 'choice != QMessageBox.StandardButton.Yes' in body
+    assert "subprocess.Popen(" in body
+    assert "CREATE_NEW_CONSOLE" in body
+    assert "setup_hungarian_voice.ps1" in body
+    assert "get_user_data_dir" not in body
+    assert 'self._hu_voice_setup_btn.clicked.connect(self._launch_hu_voice_setup)' in source
