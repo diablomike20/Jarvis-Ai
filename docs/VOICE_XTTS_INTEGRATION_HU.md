@@ -292,3 +292,28 @@ Referenciák:
 - Coqui telepítés: https://coqui-tts.readthedocs.io/en/latest/installation.html
 - Windows PyTorch: https://pytorch.org/get-started/locally/
 - XTTS-v2 magyar nyelv: https://coqui-tts.readthedocs.io/en/latest/models/xtts.html
+
+
+## Telepítés közvetlenül a JARVIS kezelőfelületéről
+
+Ha a projekt saját Windows telepítése már létezik és a \`.venv\`
+könyvtárban elérhető, a valódi JARVIS **Settings → System &
+Connectivity → Audio Routing & Hardware Controls** képernyőjén
+megjelenik a **Magyar hangmotor előkészítése (Windows)** gomb.
+
+A gomb **kifejezett megerősítést kér**, és külön, látható
+PowerShell-konzolban indítja a \`scripts/setup_hungarian_voice.ps1\`
+fájlt \`-Install -InstallFFmpeg -PrepareModel\` paraméterekkel.
+Itt a felhasználó láthatja a letöltéseket, a telepítési hibákat és
+az XTTS modelllicenc esetleges elfogadási kérését. A JARVIS
+nem fogadja el automatikusan a licencet, és nem küld hangmintát
+GitHubra vagy más szolgáltatásba.
+
+Ha az alkalmazás telepített EXE-ből fut, és nincs mellette
+a projekt \`.venv\` környezete vagy a PowerShell beüzemelő,
+ez a fejlesztői funkció figyelmeztetést ad. Nem próbálja
+módosítani a telepített EXE környezetét.
+
+A beüzemelés után a magyar XTTS kapcsolóját és a referencia
+importálását **továbbra is külön** kell aktiválni, csak jogosult
+referenciahanggal. A hangpróba csak így engedélyezhető.
