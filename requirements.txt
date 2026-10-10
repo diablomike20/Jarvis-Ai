@@ -37,3 +37,6 @@ PyQt6-WebEngine
 edge-tts
 matplotlib
 speedtest-cli
+
+# Current Google Gen AI SDK used by workspace_store and other integrations
+google-genai
