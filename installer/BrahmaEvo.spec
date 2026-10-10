@@ -36,6 +36,10 @@ a = Analysis(
         *copy_metadata('torch'),
         *copy_metadata('torchaudio'),
         *copy_metadata('transformers'),
+        *copy_metadata('f5-tts'),
+        *copy_metadata('coqui-tts'),
+        *copy_metadata('safetensors'),
+        *copy_metadata('tokenizers'),
         *collect_data_files('torchcodec'),
     ],
     hiddenimports=[
