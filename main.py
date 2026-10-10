@@ -150,7 +150,9 @@ def _startup_log(message: str) -> None:
 
 
 def _ensure_desktop_shortcut() -> None:
-    if os.name != "nt":
+    if os.name != "nt" or getattr(sys, "frozen", False):
+        # Genuine Inno Setup builds already create the official JARVIS icon
+        # shortcuts; do not spawn a stale second Brahma shortcut from the EXE.
         return
 
     marker_path = get_user_data_dir() / "config" / ".desktop_shortcut_created"
