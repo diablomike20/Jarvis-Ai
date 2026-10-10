@@ -220,7 +220,6 @@ class BackgroundWidget(QWidget):
             except Exception:
                 self._fallback_pixmap = None
         self._web_view = None
-        self._orb_embedded = False
 
         if WEB_ENGINE_AVAILABLE:
             self._init_web_engine()
@@ -249,15 +248,6 @@ class BackgroundWidget(QWidget):
             self._web_view.loadFinished.connect(self._on_web_loaded)
 
             file_url = QUrl.fromLocalFile(str(html_path.resolve()))
-            try:
-                from memory import config_manager
-                if config_manager.get_setting("jarvis_orb_enabled", False):
-                    from actions.orb_static_server import start_embedded_orb
-                    file_url = QUrl(start_embedded_orb(BASE_DIR / "assets" / "jarvis_orb"))
-                    self._orb_embedded = True
-            except (ImportError, FileNotFoundError, OSError, RuntimeError) as exc:
-                print("[BackgroundWidget] Orb unavailable; original background retained:", type(exc).__name__)
-                self._orb_embedded = False
             self._web_view.load(file_url)
 
             w = max(self.width(), 800)
@@ -277,13 +267,6 @@ class BackgroundWidget(QWidget):
             st = getattr(self, "_last_state", "IDLE") or "IDLE"
             self._do_set_ai_state(st)
         elif not ok:
-            if self._orb_embedded:
-                self._orb_embedded = False
-                print("[BackgroundWidget] Orb load failed; restoring original background.")
-                fallback = BASE_DIR / "assets" / "web_background" / "index.html"
-                if fallback.exists() and self._web_view:
-                    self._web_view.load(QUrl.fromLocalFile(str(fallback.resolve())))
-                return
             print("[BackgroundWidget] Background WebEngine failed to load, retrying in 250ms...")
             html_path = BASE_DIR / "assets" / "web_background" / "index.html"
             if html_path.exists() and self._web_view:
@@ -11395,47 +11378,9 @@ class SystemConnectivityPage(QWidget):
 
         lay.addWidget(audio_card)
 
-        # The true React/Three.js Orb is bundled with JARVIS; no separate app.
-        orb_card = self._card(
-            "JARVIS 3D Orb — választható élő háttér",
-            "Az új WebGL Orb közvetlenül a JARVIS hangállapotait és hangerőjelét kapja. "
-            "Az eredeti animáció változatlanul elérhető.",
-        )
-        olay = orb_card.layout()
-        from memory import config_manager
-        self._jarvis_orb_toggle = self._mk_toggle(
-            "Új JARVIS 3D Orb animáció használata",
-            bool(config_manager.get_setting("jarvis_orb_enabled", False)),
-            self._on_jarvis_orb_toggled,
-        )
-        olay.addWidget(self._jarvis_orb_toggle)
-        hint = QLabel("A háttér módosítása a következő JARVIS-indításkor lép érvénybe.")
-        hint.setWordWrap(True)
-        olay.addWidget(hint)
-        lay.addWidget(orb_card)
-
         lay.addStretch(1)
         return col
 
-
-    def _on_jarvis_orb_toggled(self, enabled: bool):
-        from memory import config_manager
-        try:
-            config_manager.set_setting("jarvis_orb_enabled", bool(enabled))
-            if config_manager.get_setting("jarvis_orb_enabled") is not bool(enabled):
-                raise OSError("Orb preference not persisted")
-        except Exception:
-            QMessageBox.warning(self, "JARVIS Orb", "A háttér választását nem sikerült elmenteni.")
-            self._jarvis_orb_toggle.blockSignals(True)
-            self._jarvis_orb_toggle.setChecked(not enabled)
-            self._jarvis_orb_toggle.blockSignals(False)
-            return
-        QMessageBox.information(
-            self, "JARVIS Orb",
-            "A következő JARVIS-indításkor az új 3D Orb animáció jelenik meg."
-            if enabled else
-            "A következő JARVIS-indításkor az eredeti animáció jelenik meg.",
-        )
 
     def _refresh_hu_voice_controls(self):
         from actions.jarvis_voice import voice_readiness
