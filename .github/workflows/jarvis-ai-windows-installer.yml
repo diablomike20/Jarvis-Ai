@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Keep only the newest complete-installer build when iterating on this branch.
+# The Torch/Coqui/F5 environment is large; do not run redundant builds.
+concurrency:
+  group: jarvis-windows-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-windows-installer:
     runs-on: windows-latest
