@@ -1,14 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata, collect_dynamic_libs
 
 cwd = os.path.abspath(os.getcwd())
 
 a = Analysis(
     [os.path.join(cwd, 'main.py')],
     pathex=[],
-    binaries=[],
+    binaries=[*collect_dynamic_libs('torchcodec')],
     datas=[
         (os.path.join(cwd, 'assets'), 'assets'),
         (os.path.join(cwd, 'config'), 'config'),
@@ -29,6 +29,14 @@ a = Analysis(
         # importlib.resources. collect_submodules alone omits this YAML.
         *collect_data_files('f5_tts'),
         *collect_data_files('TTS'),
+        # Transformers checks installed torchcodec distribution metadata at import.
+        # PyInstaller does NOT copy *.dist-info automatically, despite copying
+        # torchcodec's Python package; the frozen EXE crashed here in CI.
+        *copy_metadata('torchcodec'),
+        *copy_metadata('torch'),
+        *copy_metadata('torchaudio'),
+        *copy_metadata('transformers'),
+        *collect_data_files('torchcodec'),
     ],
     hiddenimports=[
         'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'google.generativeai', 'PyQt6', 'PyQt6.QtWebEngineCore',
@@ -36,7 +44,8 @@ a = Analysis(
         'keyboard', 'docx', 'pptx', 'multipart', 'passlib', 'bcrypt', 'aiohttp', 'websockets',
         'uvicorn', 'fastapi', 'plyer', 'pydantic', 'typing_extensions', 'requests', 'beautifulsoup4',
         'pyaudio', 'numpy', 'torch', 'torchaudio', 'soundfile', 'imageio_ffmpeg',
-        'huggingface_hub', *collect_submodules('f5_tts'), *collect_submodules('TTS')
+        'huggingface_hub', 'torchcodec', *collect_submodules('torchcodec'),
+        *collect_submodules('f5_tts'), *collect_submodules('TTS')
     ],
     hookspath=[],
     hooksconfig={},
