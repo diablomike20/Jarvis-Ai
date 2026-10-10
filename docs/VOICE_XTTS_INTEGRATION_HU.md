@@ -226,3 +226,69 @@ az operációs rendszeren belül még befejeződhet.
 **Továbbra sincs igazolva**: valódi Win10/11 GUI + PyTorch CUDA,
 XTTS-v2 modellbetöltés és kiejtés, privát referenciahang használatával
 végzett sikeres beszéd, illetve teljes STT→AI→TTS E2E.
+
+
+## Egyparancsos Windows-beüzemelés — 2026-10-10
+
+A működő JARVIS \`bootstrap.ps1\` telepítője a projekt gyökerében
+\`.venv\` nevű Python környezetet hoz létre. Az új beüzemelő **ezt
+használja**, nem másik Pythonhoz telepíti a modellt, és nem hoz létre
+új környezetet. A meglévő JARVIS-projekt gyökeréből, PowerShellben:
+
+**Csak ellenőrzés, semmilyen telepítés vagy letöltés:**
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_hungarian_voice.ps1
+~~~
+
+**Felhasználó által indított tényleges telepítés és modelltöltés:**
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_hungarian_voice.ps1 -Install -InstallFFmpeg -PrepareModel
+~~~
+
+A telepítő a szükséges nyilvános Coqui/PyTorch csomagokat a
+**meglévő alkalmazás-venvbe** helyezi, a Torch alapértelmezésben
+a hivatalos CPU indexéről érkezik. A korábban telepített Torch/TorchAudio
+csomagokat nem cseréli le, ha mindkettő jelen van; NVIDIA CUDA build
+automatikus kiválasztását nem ígéri. FFmpeg csak az \`-InstallFFmpeg\`
+kapcsolóval települ; a \`-PrepareModel\` explicit modellcache-letöltést
+és interaktív licenckérdést is kiválthat. **Az elfogadás nem automatizált.**
+Nincs adminjogkérés és nincs privát hangmintafeltöltés. A telepítés
+befolyásolhatja a meglévő \`.venv\` csomagverzióit: előtte készíts
+visszaállítási pontot a projektfájlokról, és szükség esetén futtasd
+újra a JARVIS eredeti követelményfájl szerinti telepítést.
+
+Ha a saját \`ffmpeg\` parancs még nem érhető el közvetlenül a winget
+telepítése után, **nyiss új terminált**, és ellenőrizd:
+\`ffmpeg -version\`.
+
+Ezután a JARVIS beállításaiban, a Magyar XTTS hang szekcióban
+importálhatod a saját, megfelelő engedéllyel rendelkező hangfájlt.
+Az automatikus előkészítés a PCM WAV-ot per-user lokális adatkönyvtárba
+helyezi. A magyar hangot csak ezután, a felületen látható
+külön beleegyezés után lehet bekapcsolni.
+
+**Első hallható teszt** a JARVIS kezelőfelületi próbagombjával,
+vagy kifejezett CLI-paranccsal:
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_hungarian_voice.ps1 -Speak
+~~~
+
+Ez nem feltétlenül azonnali: CPU-n a szintézis lassú lehet.
+A CLI visszatérési kódja csak a lejátszási útvonal sikerét jelzi,
+nem ellenőrzi akusztikai módszerrel, hogy a hangszórón tényleg
+hallható volt-e a beszéd vagy megfelelő volt-e a hangminőség.
+A STOP események továbbra is megszakíthatják a próbát.
+
+**Mit tesztel a CI?** A Windows runner PowerShell 5.1 nyelvtani
+ellenőrzést és a tényleges \`-Install\` nélküli diagnosztika-futtatást
+végez ideiglenes JARVIS \`.venv\`-ben. A Coqui és PyTorch
+telepítését, a több gigabájtos modell letöltését és a valós
+beszédkimenetet **nem végzi el automatikusan**.
+
+Referenciák:
+- Coqui telepítés: https://coqui-tts.readthedocs.io/en/latest/installation.html
+- Windows PyTorch: https://pytorch.org/get-started/locally/
+- XTTS-v2 magyar nyelv: https://coqui-tts.readthedocs.io/en/latest/models/xtts.html
