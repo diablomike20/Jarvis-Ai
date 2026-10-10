@@ -52,7 +52,7 @@ def test_converts_local_mp3_into_private_pcm_wav(private_dir, tmp_path, monkeypa
     command, options = calls[0]
     assert command[0] == "fake_ffmpeg"
     assert command[command.index("-ss") + 1] == "12"
-    assert command[command.index("-t") + 1] == "25"
+    assert command[command.index("-t") + 1] == "12"
     assert options["shell"] is False
     assert options["stdin"] is subprocess.DEVNULL
     assert options["stdout"] is subprocess.DEVNULL
