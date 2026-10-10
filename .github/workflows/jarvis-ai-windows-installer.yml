@@ -52,7 +52,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller or desktop runtime installation failed." }
           python -m pip install --no-deps "f5-tts==1.1.22"
           if ($LASTEXITCODE -ne 0) { throw "F5 Hungarian runtime installation failed." }
-          python -m pip install --prefer-binary cached_path hydra-core omegaconf accelerate ema-pytorch pydub pypinyin safetensors torchdiffeq transformers_stream_generator unidecode vocos x-transformers wandb
+          python -m pip install --prefer-binary cached_path hydra-core omegaconf accelerate ema-pytorch pydub pypinyin rjieba tomli safetensors torchdiffeq transformers_stream_generator unidecode vocos x-transformers wandb
           if ($LASTEXITCODE -ne 0) { throw "F5-TTS inference dependencies failed." }
           python -c "import numpy, sounddevice, google.genai, google.generativeai; from PyQt6.QtWebEngineWidgets import QWebEngineView; from f5_tts.api import F5TTS; from TTS.api import TTS; print('WINDOWS JARVIS ENGINE IMPORTS OK')"
           if ($LASTEXITCODE -ne 0) { throw "JARVIS Gemini, Qt, F5, XTTS imports failed." }
