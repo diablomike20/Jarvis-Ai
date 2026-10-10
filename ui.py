@@ -10466,8 +10466,12 @@ class HungarianVoiceSetupWorker(_DaemonVoiceWorker):
     def run(self):
         try:
             if self._engine == "f5":
-                from actions.f5_hungarian import download_model
+                from actions.f5_hungarian import download_model, _load_f5
                 ok = download_model(user_approved=True)
+                if ok:
+                    # Load the actual Hungarian checkpoint and public vocoder
+                    # in this daemon task, before claiming setup is complete.
+                    ok = _load_f5() is not None
             else:
                 from actions.jarvis_voice import _load_model
                 ok = _load_model() is not None
