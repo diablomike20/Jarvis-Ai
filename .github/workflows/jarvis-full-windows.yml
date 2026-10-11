@@ -1,0 +1,59 @@
+name: JARVIS Complete Windows EXE Preview
+
+on:
+  push:
+    branches:
+      - feature/jarvis-claude-full-runtime-20261011
+    paths:
+      - 'installer/**'
+      - 'core/claude_runtime.py'
+      - 'core/brahma_mcp_stdio.py'
+      - '.github/workflows/jarvis-full-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-brahma-claude:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+      - name: Prepare reconstructed Claude Code and bundled Node
+        shell: pwsh
+        run: ./installer/prepare_claude_runtime.ps1
+      - name: Install Brahma Python dependencies and PyInstaller
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --prefer-binary -r requirements.txt pyinstaller
+      - name: Build full JARVIS Windows distribution
+        shell: pwsh
+        env:
+          BRAHMA_REQUIRE_CLAUDE_BUNDLE: '1'
+        run: pyinstaller --noconfirm --clean installer/BrahmaEvo.spec
+      - name: Verify portable EXE and bundled Claude components
+        shell: pwsh
+        run: |
+          $folder = Join-Path $PWD 'dist/BrahmaEvo'
+          if (-not (Test-Path (Join-Path $folder 'BrahmaEvo.exe'))) { throw 'BrahmaEvo.exe missing' }
+          if (-not (Test-Path (Join-Path $folder 'BrahmaMcp.exe'))) { throw 'BrahmaMcp.exe missing' }
+          if (-not (Get-ChildItem $folder -Recurse -Filter cli.js | Where-Object FullName -Match 'claude-code')) { throw 'Reconstructed cli.js missing' }
+          if (-not (Get-ChildItem $folder -Recurse -Filter node.exe)) { throw 'Bundled node.exe missing' }
+          if (-not (Get-ChildItem $folder -Recurse -Filter claude-feature-manifest.json)) { throw 'Claude feature manifest missing' }
+          Write-Host 'Full JARVIS EXE layout present.'
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: BRAHMA-JARVIS-Claude-Full-Windows-Preview
+          path: dist/BrahmaEvo/
+          retention-days: 7
+          if-no-files-found: error
