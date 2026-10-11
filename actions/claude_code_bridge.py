@@ -10,6 +10,17 @@ from core.claude_runtime import ClaudeRuntimeError, probe_claude_runtime, run_cl
 
 SETTINGS_PATH = get_user_data_dir() / "config" / "app_settings.json"
 
+# Shared by all JARVIS invocation paths, including agent/executor.py.
+# The Qt frontend registers thread-safe signals, not direct widget access.
+_DEFAULT_EVENT_CALLBACK = None
+_DEFAULT_PERMISSION_CALLBACK = None
+
+
+def register_claude_callbacks(on_event=None, approve_tool=None) -> None:
+    global _DEFAULT_EVENT_CALLBACK, _DEFAULT_PERMISSION_CALLBACK
+    _DEFAULT_EVENT_CALLBACK = on_event if callable(on_event) else None
+    _DEFAULT_PERMISSION_CALLBACK = approve_tool if callable(approve_tool) else None
+
 
 def _load_settings() -> dict[str, Any]:
     try:
@@ -74,8 +85,8 @@ def run_developer_mode_request(parameters: dict[str, Any], speak=None) -> str:
     if not workspace.is_dir():
         return f"Claude Code: nem könyvtár: {workspace}"
 
-    event_handler = params.get("_on_claude_event")
-    approval_handler = params.get("_approve_tool")
+    event_handler = params.get("_on_claude_event") or _DEFAULT_EVENT_CALLBACK
+    approval_handler = params.get("_approve_tool") or _DEFAULT_PERMISSION_CALLBACK
     try:
         timeout = float(params.get("timeout") or 300)
         timeout = min(max(timeout, 10), 3600)
