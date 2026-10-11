@@ -1,0 +1,28 @@
+name: JARVIS Claude Runtime Smoke Tests
+
+on:
+  push:
+    branches:
+      - feature/jarvis-claude-full-runtime-20261011
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-bridge:
+    name: Bridge and native MCP (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Claude runtime (hermetic, no API key)
+        run: python -m unittest discover -s tests -p test_claude_runtime.py -v
+      - name: Brahma desktop MCP transport
+        run: python -m unittest discover -s tests -p test_brahma_mcp_stdio.py -v
