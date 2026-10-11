@@ -6,8 +6,14 @@ on:
       - feature/jarvis-claude-full-runtime-20261011
     paths:
       - 'installer/**'
+      - 'main.py'
+      - 'ui.py'
+      - 'or_client.py'
+      - 'requirements.txt'
+      - 'core/ai_startup.py'
       - 'core/claude_runtime.py'
       - 'core/brahma_mcp_stdio.py'
+      - 'actions/claude_code_bridge.py'
       - '.github/workflows/jarvis-full-windows.yml'
   workflow_dispatch:
 
