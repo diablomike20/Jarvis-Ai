@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Brahma Evo Remote</title>
+  <title>Jarvis AI Remote</title>
   <script src="/static/crypto.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -433,12 +433,12 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="logo"><em>Brahma Evo</em></div>
+        <div class="logo"><em>Jarvis AI</em></div>
         <div class="badge">Online</div>
       </div>
       <div class="nav">
         <div class="nav-item active">Dashboard</div>
-        <div class="nav-item">Brahma Evo Home</div>
+        <div class="nav-item">Jarvis AI Home</div>
         <div class="nav-item">Settings</div>
       </div>
       <div class="status-card">
@@ -457,8 +457,8 @@
     <section class="main-panel">
       <div class="topbar">
         <div>
-          <div class="page-title">Brahma Evo Home</div>
-          <div class="page-subtitle">Control your home with Brahma Evo.</div>
+          <div class="page-title">Jarvis AI Home</div>
+          <div class="page-subtitle">Control your home with Jarvis AI.</div>
         </div>
         <div class="top-actions">
           <div class="badge">Home Status</div>
@@ -561,11 +561,11 @@
             <div class="voice-header">
               <div>
                 <div class="section-title">Voice Control</div>
-                <div class="section-subtitle">Use Brahma Evo voice commands to control devices quickly.</div>
+                <div class="section-subtitle">Use Jarvis AI voice commands to control devices quickly.</div>
               </div>
               <div class="status-pill"><span class="dot"></span>Listening</div>
             </div>
-            <div class="voice-note">Say “Brahma Evo” followed by your command, or type it below.</div>
+            <div class="voice-note">Say “Jarvis AI” followed by your command, or type it below.</div>
             <div class="voice-actions">
               <button class="btn btn-secondary" onclick="doWake()">Wake</button>
               <button class="btn btn-send" onclick="doSend()">Send</button>
@@ -574,7 +574,7 @@
         </div>
       </div>
       <footer>
-        <input id="inp" placeholder="Send a command to Brahma Evo…" autocomplete="off">
+        <input id="inp" placeholder="Send a command to Jarvis AI…" autocomplete="off">
         <label class="btn-attach" for="file-inp" title="Send file">📎</label>
         <input type="file" id="file-inp" multiple accept="*/*" style="display:none">
         <button id="mic-btn" onclick="doMic()" title="Voice command">🎤</button>
@@ -640,7 +640,7 @@
     const _wsUrl   = `${_wsProto}://${location.host}/ws?token=${encodeURIComponent(_authToken)}`;
     const ws       = new WebSocket(_wsUrl);
 
-    ws.onopen    = () => { sys('Remote session active.'); toast('Connected to Brahma Evo'); };
+    ws.onopen    = () => { sys('Remote session active.'); toast('Connected to Jarvis AI'); };
     ws.onclose   = () => sys('Connection lost — refresh to reconnect.');
     ws.onerror   = () => sys('Connection error.');
     ws.onmessage = (e) => {
@@ -662,9 +662,9 @@
 
     function append(speaker, text) {
       const d = document.createElement('div');
-      if (speaker === 'brahma evo') {
+      if ((speaker === 'jarvis ai' || speaker === 'brahma evo')) {
         d.className = 'msg msg-j';
-        d.innerHTML = `<div class="lbl">Brahma Evo</div>${esc(text)}`;
+        d.innerHTML = `<div class="lbl">Jarvis AI</div>${esc(text)}`;
       } else {
         d.className = 'msg msg-u';
         d.innerHTML = `<div class="lbl">You</div>${esc(text)}`;

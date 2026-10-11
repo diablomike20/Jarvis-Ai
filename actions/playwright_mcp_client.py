@@ -14,7 +14,7 @@ logger.setLevel(logging.INFO)
 
 
 def _get_app_data_dir() -> Path:
-    """Returns local app data directory for Brahma AI."""
+    """Returns local app data directory for Jarvis AI."""
     if platform.system() == "Windows":
         base = os.environ.get("LOCALAPPDATA")
         if base:

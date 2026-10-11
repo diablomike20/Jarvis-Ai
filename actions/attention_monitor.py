@@ -396,23 +396,35 @@ _speak_lock = threading.Lock()
 
 
 def _speak_edge_native(text: str, force_edge: bool = False) -> None:
-    global _current_player_alias, _current_audio_path
+    global _current_player_alias, _current_audio_path, _current_speech_proc
     text = (text or "").strip()
     if not text:
         return
 
-    # When entered fully local mode from settings, use the offline native male voice unless force_edge requested
-    if not force_edge:
-        try:
-            from memory import config_manager
-            cfg = config_manager.load_settings()
-            if cfg.get("offline_mode_enabled", False):
+    # Serialize ALL backends: XTTS, offline SAPI and Edge must not overlap.
+    with _speak_lock:
+        if not force_edge:
+            offline_mode = False
+            try:
+                from memory import config_manager
+                offline_mode = bool(
+                    config_manager.load_settings().get("offline_mode_enabled", False)
+                )
+            except Exception:
+                pass
+
+            try:
+                from actions.jarvis_voice import speak_authorized_hungarian
+                if speak_authorized_hungarian(text):
+                    return
+            except Exception as exc:
+                print(f"[JarvisVoice] XTTS routing failed ({type(exc).__name__}); fallback.")
+
+            # Strict offline fallback: never send spoken text to Edge.
+            if offline_mode:
                 _speak_sapi_male(text)
                 return
-        except Exception:
-            pass
 
-    with _speak_lock:
         try:
             import edge_tts
         except Exception as exc:
@@ -476,6 +488,11 @@ def speak_native(text: str, force_edge: bool = False) -> None:
 
 
 def stop_native_speech() -> None:
+    try:
+        from actions.jarvis_voice import stop_authorized_hungarian
+        stop_authorized_hungarian()
+    except Exception:
+        pass
     _cleanup_current_audio()
 
 

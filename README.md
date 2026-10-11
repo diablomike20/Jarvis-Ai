@@ -1,14 +1,13 @@
-# ⚡ Brahma AI Evo — Autonomous Desktop Operating Intelligence
+# ⚡ Jarvis AI — Autonomous Desktop Operating Intelligence
 
 <div align="center">
 
-<img src="assets/brahma_evo_logo.png" alt="Brahma AI Evo Logo" width="220" />
+<div align="center"><strong>◉ JARVIS AI</strong></div>
 
 ### *The Self-Evolving, Multimodal Personal AI Desktop Environment*
 
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6%20%2B%20WebEngine-darkgreen?logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
-[![Gemini 2.5](https://img.shields.io/badge/Model-Gemini%202.5%20Flash%20Native%20Audio-orange?logo=google&logoColor=white)](https://ai.google.dev/)
 [![MCP](https://img.shields.io/badge/Protocol-Model%20Context%20Protocol-purple)](https://modelcontextprotocol.io/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?logo=windows&logoColor=white)](https://microsoft.com/windows)
 
@@ -18,22 +17,22 @@
 
 ## 🌌 Overview
 
-**Brahma AI Evo** is a next-generation desktop intelligence built to function like an authentic JARVIS workstation. Combining real-time bi-directional native voice audio, multimodal computer vision, autonomous code self-evolution, and local system orchestrations, Brahma Evo transforms your Windows PC into a self-evolving command center.
+**Jarvis AI** is a next-generation desktop intelligence built to function like an authentic JARVIS workstation. Combining real-time bi-directional native voice audio, multimodal computer vision, autonomous code self-evolution, and local system orchestrations, Jarvis AI transforms your Windows PC into a self-evolving command center.
 
 ---
 
-## ⚡ What's New in Brahma AI Evo
+## ⚡ What's New in Jarvis AI
 
 ### 1. 🔌 Holographic Hardware Assembler & Circuit HUD
-- **Screen & Voice Part Recognition**: Brahma scans your screen via computer vision or parses voice commands (`"Brahma, how to connect DHT11 to Arduino Pro Mini"`) to recognize microcontrollers (Arduino Uno, Pro Mini, ESP32), sensors (DHT11, HC-SR04 ultrasonic, servos), and passive components.
-- **In-App Interactive Pop-up**: Opens a compact, dark glassmorphic popup overlay directly inside Brahma showing:
+- **Screen & Voice Part Recognition**: Jarvis AI scans your screen via computer vision or parses voice commands (`"Jarvis AI, how to connect DHT11 to Arduino Pro Mini"`) to recognize microcontrollers (Arduino Uno, Pro Mini, ESP32), sensors (DHT11, HC-SR04 ultrasonic, servos), and passive components.
+- **In-App Interactive Pop-up**: Opens a compact, dark glassmorphic popup overlay directly inside Jarvis AI showing:
   - Component cards with pinout labels (`VCC`, `DATA`, `GND`, `2`, `p8`, `p9`).
   - **Animated glowing neon SVG wires** with real-time flowing white electron pulse dots.
   - Numbered pin bubbles (`①`, `②`, `③`, `④`, `⑤`).
   - Operating voltage safety callouts and ready-to-flash Arduino C++ firmware.
 
 ### 2. 🧬 Project Ultron — Self-Evolving Autonomous Skill Crucible
-- **On-the-Fly Code Synthesis**: When asked to execute a task outside its built-in toolkit, Brahma identifies the capability gap, writes a brand-new Python tool directly into `features/`, tests it inside an isolated sandbox ("The Crucible"), and auto-registers it dynamically without restarting the application.
+- **On-the-Fly Code Synthesis**: When asked to execute a task outside its built-in toolkit, Jarvis AI identifies the capability gap, writes a brand-new Python tool directly into `features/`, tests it inside an isolated sandbox ("The Crucible"), and auto-registers it dynamically without restarting the application.
 - **Persistent Vault**: All forged skills are saved in your `features/` directory and hot-reloaded automatically.
 
 ### 3. 🛡️ Proactive Auto-Heal Engine
@@ -44,7 +43,7 @@
 - **Dynamic State Glow States**:
   - 🟡 **Gold**: Standby / Listening
   - 🔵 **Cyan / Blue**: Capturing Voice (Live Energy Wave)
-  - 🟣 **Purple**: Brahma Reasoning / Thinking
+  - 🟣 **Purple**: Jarvis AI Reasoning / Thinking
   - 🟢 **Green**: Executing Tool / System Action
   - 🔴 **Red**: Muted
 
@@ -60,7 +59,7 @@
 
 ### 8. ⚙️ Centralized API Setup Hub
 - Complete Settings UI featuring dedicated cards for every connected service:
-  - Google Gemini API (Live Voice & Vision)
+  - OpenRouter API (text and image understanding)
   - Spotify MCP (Client ID & Client Secret)
   - OpenRouter / Anthropic
   - Weather & Radar APIs
@@ -72,7 +71,7 @@
 ## 🛠️ Core Capabilities
 
 ### 🎙️ Multimodal Native Audio & Vision
-- Sub-500ms low-latency conversation via Gemini 2.5 Flash Native Audio.
+- Text chat via OpenRouter free models or a local Ollama model; response latency varies by provider and hardware.
 - Live webcam and desktop screen vision for real-time document analysis, code debugging, and hardware component recognition.
 
 ### 🖥️ Deep Windows Desktop Orchestration
@@ -87,8 +86,8 @@
 - **PowerPoint (`.pptx`)**: Build branded presentations with slide layouts, typography, and speaker notes.
 - **PDF Suite**: Convert, merge, extract, and assemble PDF deliverables.
 
-### 📱 Brahma Connect (Android Companion)
-- **AI Phone Call Proxy**: Brahma screens incoming phone calls, talks to the caller, takes meeting notes, and delivers immediate desktop transcripts and summaries.
+### 📱 Jarvis AI Connect (Android Companion)
+- **AI Phone Call Proxy**: Jarvis AI screens incoming phone calls, talks to the caller, takes meeting notes, and delivers immediate desktop transcripts and summaries.
 - **Ecosystem Sync**: Device geolocation, SMS notifications, and battery status.
 
 ### 🏡 Smart Home Hub
@@ -99,21 +98,68 @@
 
 ---
 
+## Gemini removal (Jarvis fork)
+
+This branch removes the Google Gemini SDK, API key, provider selection and Gemini Live
+runtime. **Text chat** uses OpenRouter or local Ollama. Screen/camera image analysis uses
+a free OpenRouter vision-capable model (requires a configured OpenRouter key and internet), or a locally configured vision-capable Ollama model.
+Spoken replies use the native/Edge TTS fallback.
+
+**Important:** the former Gemini Live always-on microphone conversation is not replaced
+by this migration. Optional Hungarian microphone transcription is supported through local faster-whisper (see the setup below). Existing Gemini keys in user-local config files are no longer read by
+the application; delete them manually if desired. The application still contains
+legacy Jarvis AI branding and upstream license restrictions.
+
+## Gemini nélkül: magyar mikrofon és ingyenes modellek
+
+A jelenlegi csereág az OpenRouter [ingyenes modellválasztóját](https://openrouter.ai/openrouter/free)
+használja alapértelmezésként, és a korábbi fizetős képelemzési modellt is
+eltávolítja. A mikrofonos magyar parancsokhoz az opcionális `faster-whisper`
+modult telepítheted:
+
+```powershell
+python -m pip install -r requirements-voice.txt
+```
+
+[Teljes magyar Gemini-csere útmutató](docs/GEMINI_MIGRATION_HU.md).
+
+## JARVIS önfejlesztés — felhasználói jóváhagyással
+
+A Skill Forge továbbra is készít új Python-képességeket, de most
+**először tervezetet ment**, és csak a JARVIS HUD jóváhagyása után
+futtatja a teszteket és aktiválja a kész modult. Az Auto-Heal saját
+forráskódjavításai is előzetes jóváhagyást igényelnek. Többé nincs
+automatikus Python-csomagtelepítés; a jóváhagyott subprocess-tesztek
+még nem jelentenek teljes OS-szintű sandboxot.
+
+[Önfejlesztés és biztonság – magyar leírás](docs/SELF_EVOLUTION_HU.md)
+
+## Tetszőleges source projekt moduláris beépítése
+
+A **JARVIS Source Plugin Framework** bármely ellenőrzött GitHub-source
+képességeit fogadhatja egy kis adapterrel. Az első három integráció:
+PhotoCraft, LightCraft és FilmCraft. Az MCP stdio-t támogató, telepített
+projektek a `integrations/sources/<id>/manifest.json` fájl segítségével
+regisztrálhatók külön JARVIS-főprogrammódosítás nélkül.
+
+[Új GitHub-source beépítése – magyar útmutató](docs/SOURCE_PLUGINS_HU.md) ·
+[Creative Studio](docs/CREATIVE_STUDIO_HU.md)
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 - **Windows 10 / 11** (64-bit)
 - **Python 3.11** or **Python 3.12**
 - **Git**
-- Working Microphone & Speakers (Webcam optional for vision)
-- **Google Gemini API Key** (Get from [Google AI Studio](https://aistudio.google.com/))
+- Speakers (optional; OpenRouter-powered screen and camera analysis available)
+- **OpenRouter API Key** (Get from [OpenRouter](https://openrouter.ai/settings/keys))
 
 ### Installation
 
 1. **Clone the repository:**
    ```powershell
-   git clone https://github.com/titechprabhasolutions/Brahma-Ai-Evo.git
-   cd Brahma-Ai-Evo
+   git clone https://github.com/diablomike20/Jarvis-Ai.git
+   cd Jarvis-Ai
    ```
 
 2. **Run the Automated Setup:**
@@ -126,9 +172,9 @@
    ```
 
 3. **Configure API Keys:**
-   - Launch Brahma AI Evo.
+   - Launch Jarvis AI.
    - Click the **Settings** icon on the top navigation bar.
-   - Enter your **Gemini API Key** and any optional credentials (Spotify MCP, Weather, etc.) into the respective cards.
+   - Enter your **OpenRouter API Key** and any optional credentials (Spotify MCP, Weather, etc.) into the respective cards.
    - Click **Save & Connect**.
 
 ---
@@ -137,9 +183,9 @@
 
 | Intent | Sample Voice / Text Command |
 | :--- | :--- |
-| **Hardware Circuit** | *"Brahma, how to connect DHT11 to Arduino Pro Mini"* |
+| **Hardware Circuit** | *"Jarvis AI, how to connect DHT11 to Arduino Pro Mini"* |
 | **Circuit Vision** | *"See the Arduino parts on my screen and tell me how to assemble them"* |
-| **Self-Evolution** | *"Brahma, learn a new skill to track International Space Station coordinates"* |
+| **Self-Evolution** | *"Jarvis AI, learn a new skill to track International Space Station coordinates"* |
 | **Flight Radar** | *"Show flight route from Mumbai to London"* |
 | **Nearby Amenities** | *"Find nearby hospitals on the map"* |
 | **Music Playback** | *"Play Starboy on Spotify"* |
@@ -152,7 +198,7 @@
 ## 🏗️ Architecture
 
 ```
-Brahma AI Evo/
+Jarvis AI/
 ├── main.py                     # Main application entry point & live event loop
 ├── ui.py                       # PyQt6 GUI: Command Bar, Waveform FFT, HUD Wings, Chat
 ├── actions/                    # Built-in action tools & executors
@@ -199,5 +245,5 @@ This project is licensed under the **Brahma AI Evo Source-Available Personal Use
 For full terms and legal conditions, see the [LICENSE](LICENSE) file. For commercial licensing inquiries, reach out via [Discord](https://discord.gg/gEYmJKKtq3).
 
 <div align="center">
-<b>Brahma AI Evo</b> • Built with intelligence, precision, and autonomy.
+<b>Jarvis AI</b> • Built with intelligence, precision, and autonomy.
 </div>

@@ -150,7 +150,9 @@ def _startup_log(message: str) -> None:
 
 
 def _ensure_desktop_shortcut() -> None:
-    if os.name != "nt":
+    if os.name != "nt" or getattr(sys, "frozen", False):
+        # Genuine Inno Setup builds already create the official JARVIS icon
+        # shortcuts; do not spawn a stale second Brahma shortcut from the EXE.
         return
 
     marker_path = get_user_data_dir() / "config" / ".desktop_shortcut_created"
@@ -4015,6 +4017,32 @@ class BrahmaLive:
         if not text:
             return
 
+        # All spoken announcements use the user's authorized local voice if
+        # enabled, even while Gemini Live is connected. Gemini continues to
+        # reason and listen; speech output is replaced locally.
+        try:
+            from actions.jarvis_voice import voice_readiness
+            status = voice_readiness()
+            use_custom_voice = bool(status["enabled"] and status["can_enable"])
+        except Exception:
+            use_custom_voice = False
+        if use_custom_voice:
+            def _speak_private():
+                try:
+                    self.set_speaking(True)
+                    from actions.jarvis_voice import speak_authorized_hungarian
+                    if not speak_authorized_hungarian(text):
+                        from actions.attention_monitor import _speak_edge_native
+                        _speak_edge_native(text)
+                except Exception as exc:
+                    print("[JARVIS Voice] Private speech error:", type(exc).__name__)
+                finally:
+                    self.set_speaking(False)
+            threading.Thread(
+                target=_speak_private, daemon=True, name="jarvis-authorized-voice"
+            ).start()
+            return
+
         if self.session and self._loop:
             # Route text through Gemini Live API for the unified native Charon voice
             import asyncio
@@ -5062,6 +5090,10 @@ class BrahmaLive:
     async def _receive_audio(self):
         print("[BRAHMA EVO] 👂 Recv started")
         out_buf, in_buf = [], []
+        buffered_gemini_pcm = []
+        # Re-evaluate at the START of each Gemini reply, not once per session:
+        # the user can enable/change the voice in Settings without restarting.
+        turn_local_voice = None
 
         try:
             while True:
@@ -5072,8 +5104,20 @@ class BrahmaLive:
                             self._resume_handle = _sru.new_handle
 
                     if response.data:
-                        self.set_speaking(True)
-                        self.audio_in_queue.put_nowait(response.data)
+                        if turn_local_voice is None:
+                            try:
+                                from actions.jarvis_voice import voice_readiness
+                                voice_status = voice_readiness()
+                                turn_local_voice = bool(
+                                    voice_status["enabled"] and voice_status["can_enable"]
+                                )
+                            except Exception:
+                                turn_local_voice = False
+                        if turn_local_voice:
+                            buffered_gemini_pcm.append(response.data)
+                        else:
+                            self.set_speaking(True)
+                            self.audio_in_queue.put_nowait(response.data)
 
                     if response.server_content:
                         sc = response.server_content
@@ -5110,8 +5154,50 @@ class BrahmaLive:
 
                             full_out = " ".join(out_buf).strip()
                             if full_out:
-                                self.ui.write_log(f"Brahma Evo: {full_out}")
+                                self.ui.write_log(f"JARVIS AI: {full_out}")
                             out_buf = []
+
+                            # Gemini still does the original Live reasoning, tool
+                            # handling and microphone recognition. Its audio is
+                            # buffered only when the user has explicitly enabled
+                            # a ready private local F5 / XTTS voice.
+                            if turn_local_voice:
+                                original_pcm = tuple(buffered_gemini_pcm)
+                                buffered_gemini_pcm.clear()
+                                if full_out:
+                                    self.set_speaking(True)
+                                    def _deliver_custom_voice(utterance, fallback_pcm):
+                                        played = False
+                                        try:
+                                            from actions.jarvis_voice import speak_authorized_hungarian
+                                            played = speak_authorized_hungarian(utterance)
+                                        except Exception:
+                                            pass
+                                        if not played and self._loop is not None:
+                                            # Never lose the spoken response if local
+                                            # synthesis fails. Play Gemini PCM instead.
+                                            for audio in fallback_pcm:
+                                                self._loop.call_soon_threadsafe(
+                                                    self.audio_in_queue.put_nowait, audio
+                                                )
+                                            self._loop.call_soon_threadsafe(
+                                                self.audio_in_queue.put_nowait, None
+                                            )
+                                        else:
+                                            self.set_speaking(False)
+                                    threading.Thread(
+                                        target=_deliver_custom_voice,
+                                        args=(full_out, original_pcm),
+                                        daemon=True, name="jarvis-live-custom-voice",
+                                    ).start()
+                                elif original_pcm:
+                                    self.set_speaking(True)
+                                    for audio in original_pcm:
+                                        self.audio_in_queue.put_nowait(audio)
+                                    self.audio_in_queue.put_nowait(None)
+
+                            turn_local_voice = None
+                            buffered_gemini_pcm.clear()
 
                             if full_in and len(full_in) > 5:
                                 threading.Thread(
@@ -5156,6 +5242,9 @@ class BrahmaLive:
         try:
             while True:
                 chunk = await self.audio_in_queue.get()
+                if chunk is None:
+                    self.set_speaking(False)
+                    continue
                 try:
                     pcm = np.frombuffer(chunk, dtype=np.int16)
                     lvl = float(np.sqrt(np.mean(np.square(pcm, dtype=np.float32))))
@@ -5321,10 +5410,21 @@ class BrahmaLive:
             self.ui.write_log("ERR: No AI provider configured. Set Gemini or OpenRouter key in Settings.")
             return
 
-        client = genai.Client(
-            api_key=str(keys["gemini_api_key"]).strip(),
-            http_options={"api_version": "v1beta"}
-        )
+        try:
+            client = genai.Client(
+                api_key=_get_api_key(),
+                http_options={"api_version": "v1beta"}
+            )
+        except Exception as exc:
+            # Without the Gemini key an idle GUI used to incorrectly display
+            # LISTENING although no microphone session had ever started.
+            self.ui.write_log(
+                "ERR: Gemini Live nem indul: hiányzó vagy hibás Gemini API-kulcs. "
+                "Ellenőrizd a JARVIS Settings > API beállításokat; utána indítsd újra."
+            )
+            print("[JARVIS Gemini] Client init failed:", type(exc).__name__)
+            self.ui.set_state("IDLE")
+            return
 
         while True:
             try:
@@ -5381,15 +5481,22 @@ class BrahmaLive:
                         pass
                     
             except Exception as e:
-                print(f"[BRAHMA EVO] ⚠️ {e}")
+                print("[JARVIS Gemini] Live error:", type(e).__name__)
                 traceback.print_exc()
+                self.ui.write_log(
+                    "ERR: Gemini Live nincs kapcsolódva ("
+                    + type(e).__name__
+                    + "). Újracsatlakozás folyamatban; a mikrofon most NEM figyel."
+                )
                 if _is_gemini_limit_error(e):
                     self._use_openrouter_first = True
                 self.session = None
                 self._loop = None
             self.set_speaking(False)
-            self.ui.set_state("LISTENING")
-            print("[BRAHMA EVO] 🔄 Reconnecting in 5s...")
+            # Never display a false 'LISTENING' status after the cloud audio
+            # session disconnects. The next loop attempt sets THINKING.
+            self.ui.set_state("IDLE")
+            print("[JARVIS Gemini] Reconnecting in 5s...")
             await asyncio.sleep(5)
 
 def main():
@@ -5631,6 +5738,29 @@ if __name__ == "__main__":
     import sys
     import os
     import traceback
+
+    # Frozen Windows EXE smoke (same imports as real startup, but no microphone
+    # or Gemini connection); fail before installer publication if dependencies
+    # are broken. Runtime hook records exceptions for CI.
+    if "--smoke-imports" in sys.argv:
+        import importlib
+        for module_name in (
+            "google.genai",
+            "google.generativeai",
+            "PyQt6.QtWebEngineWidgets",
+            "workspace_store",
+            "actions.jarvis_voice",
+            "actions.voice_reference",
+            "actions.f5_hungarian",
+            "f5_tts.api",
+            "TTS.api",
+            "imageio_ffmpeg",
+            "soundfile",
+            "memory.config_manager",
+        ):
+            importlib.import_module(module_name)
+        print("JARVIS FROZEN STARTUP IMPORTS OK", flush=True)
+        sys.exit(0)
 
     # Intercept subprocess calls when running as PyInstaller .exe
     if len(sys.argv) >= 2:

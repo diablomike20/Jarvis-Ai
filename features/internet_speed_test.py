@@ -73,7 +73,7 @@ def execute(**kwargs) -> Dict[str, Any]:
     colors = ["#00F0FF", "#10B981", "#F59E0B"]
 
     bars = ax.bar(labels, values, color=colors, width=0.45, edgecolor="#1E293B", linewidth=1.5)
-    ax.set_title("BRAHMA NETWORK TELEMETRY — INTERNET SPEED", color="#FFFFFF", fontsize=13, fontweight="bold", pad=15)
+    ax.set_title("JARVIS AI NETWORK TELEMETRY — INTERNET SPEED", color="#FFFFFF", fontsize=13, fontweight="bold", pad=15)
     ax.tick_params(axis="y", colors="#94A3B8")
     ax.tick_params(axis="x", colors="#FFFFFF", labelsize=10)
     ax.spines["top"].set_visible(False)

@@ -100,7 +100,7 @@ class BrahmaConnectService:
     def route_command(self, target: str, action: str, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
         return asyncio.run(self.gateway.route_command(target, action, parameters or {}))
 
-    async def disconnect_device(self, target: str, *, reason: str = "Disconnected by Brahma") -> dict[str, Any]:
+    async def disconnect_device(self, target: str, *, reason: str = "Disconnected by Jarvis AI") -> dict[str, Any]:
         return await self.gateway.disconnect_device(target, reason=reason)
 
     async def reconnect_device(self, target: str) -> dict[str, Any]:

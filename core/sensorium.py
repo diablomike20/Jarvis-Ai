@@ -1,5 +1,5 @@
 """
-Brahma Passive Sensorium Engine (v2)
+Jarvis AI Passive Sensorium Engine (v2)
 An omnipresent background telemetry and perception daemon.
 Continuously senses user context, active task dwell time, system vitals,
 and user idle state with zero performance overhead.

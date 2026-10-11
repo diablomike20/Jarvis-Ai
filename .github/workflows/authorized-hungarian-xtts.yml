@@ -1,0 +1,59 @@
+name: Authorized Hungarian XTTS routing checks
+
+on:
+  push:
+    branches:
+      - feature/jarvis-authorized-hu-xtts-integration
+  pull_request:
+    branches:
+      - feature/jarvis-ai-visual-rebrand
+
+jobs:
+  voice-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile integrated voice routing
+        run: |
+          python -m py_compile actions/jarvis_voice.py actions/voice_reference.py actions/attention_monitor.py main.py ui.py scripts/voice_doctor.py scripts/prepare_xtts_model.py scripts/voice_test_local.py
+      - name: Install test runner only (no XTTS model or voice data)
+        run: python -m pip install -q pytest
+      - name: Provide FFmpeg in CI for synthetic local conversion test
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y ffmpeg
+          ffmpeg -version | head -n 1
+      - name: Run local-only diagnostic on CI's own Python environment
+        run: python scripts/voice_doctor.py --json
+      - name: Run synthetic WAV and routing regression tests
+        run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py tests/test_voice_doctor.py tests/test_prepare_xtts_model.py tests/test_voice_qt_workers.py tests/test_voice_test_local.py
+
+  windows-voice-compatibility:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Windows voice and desktop UI modules
+        run: python -m py_compile actions/jarvis_voice.py actions/voice_reference.py actions/attention_monitor.py main.py ui.py scripts/voice_doctor.py scripts/prepare_xtts_model.py scripts/voice_test_local.py
+      - name: Install PyQt6 runtime and pytest (no model or voice files)
+        run: python -m pip install -q pytest PyQt6
+      - name: Validate PowerShell install script and read-only Windows preflight
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path (Get-Location) 'scripts/setup_hungarian_voice.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          python -m venv .venv
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup_hungarian_voice.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Smoke test Windows diagnostic (no voice files)
+        run: python scripts/voice_doctor.py --json
+      - name: Validate synthetic audio conversion and voice routing under Windows
+        run: python -m pytest -q tests/test_authorized_hungarian_voice.py tests/test_jarvis_voice_settings.py tests/test_voice_reference.py tests/test_voice_doctor.py tests/test_prepare_xtts_model.py tests/test_voice_qt_workers.py tests/test_voice_test_local.py

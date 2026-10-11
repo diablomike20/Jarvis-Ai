@@ -64,7 +64,7 @@ class InstallThread(QThread):
                 
                 # Dynamically resolve Desktop path (handles OneDrive, moved folders, etc.)
                 desktop = shell.SpecialFolders("Desktop")
-                shortcut_path = os.path.join(desktop, "Brahma Evo.lnk")
+                shortcut_path = os.path.join(desktop, "Jarvis AI.lnk")
                 
                 try:
                     shortcut = shell.CreateShortCut(shortcut_path)
@@ -79,7 +79,7 @@ class InstallThread(QThread):
                 # Start menu (dynamically resolve Programs path)
                 try:
                     start_menu = shell.SpecialFolders("Programs")
-                    shortcut_path_sm = os.path.join(start_menu, "Brahma Evo.lnk")
+                    shortcut_path_sm = os.path.join(start_menu, "Jarvis AI.lnk")
                     shortcut_sm = shell.CreateShortCut(shortcut_path_sm)
                     shortcut_sm.Targetpath = exe_path
                     shortcut_sm.WorkingDirectory = self.target_dir
@@ -100,7 +100,7 @@ class InstallThread(QThread):
 class InstallWizard(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Brahma Evo - Setup")
+        self.setWindowTitle("Jarvis AI - Setup")
         self.resize(800, 500)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -181,7 +181,7 @@ class InstallWizard(QWidget):
         box_layout = QVBoxLayout(self.content_box)
         
         # Title
-        title = QLabel("Brahma Evo Setup")
+        title = QLabel("Jarvis AI Setup")
         title.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         box_layout.addWidget(title)
@@ -194,7 +194,7 @@ class InstallWizard(QWidget):
         self.page1.setStyleSheet("background: transparent; border: none;")
         p1_layout = QVBoxLayout(self.page1)
         
-        desc = QLabel("Welcome to the Brahma Evo Setup Wizard.\nClick Install to continue.")
+        desc = QLabel("Welcome to the Jarvis AI Setup Wizard.\nClick Install to continue.")
         desc.setFont(QFont("Segoe UI", 12))
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         p1_layout.addWidget(desc)
@@ -247,7 +247,7 @@ class InstallWizard(QWidget):
         lbl_finish.setAlignment(Qt.AlignmentFlag.AlignCenter)
         p3_layout.addWidget(lbl_finish)
         
-        btn_finish = QPushButton("Launch Brahma Evo")
+        btn_finish = QPushButton("Launch Jarvis AI")
         btn_finish.clicked.connect(self.launch_app)
         
         btn_close = QPushButton("Close")

@@ -71,7 +71,10 @@ setup_android_sdk.ps1
 build_apk.ps1
 process_logo.py
 
-# Reconstructed Claude Code build artifacts (packaged at build time only)
+# Private speech references and generated voice output: never commit
+**/jarvis_hu_authorized.wav
+**/xtts_*.wav
+**/private_voice_samples/
 .build-cache/
 runtime/claude-code/dist/
 runtime/node/node.exe

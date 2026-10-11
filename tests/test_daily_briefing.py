@@ -95,6 +95,6 @@ def test_startup_daily_briefing_is_spoken_even_with_overlay_visible():
     ):
         _speak_daily_briefing(ui, spoken.append)
 
-    assert ui.messages == [("briefing", data), ("log", f"Brahma Evo: {narrative}")]
+    assert ui.messages == [("briefing", data), ("log", f"Jarvis AI: {narrative}")]
     assert spoken == [narrative]
     native_speak.assert_not_called()

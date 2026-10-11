@@ -28,7 +28,7 @@ class UnifiedAIClient:
         try:
             with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self._provider = data.get("default_ai_provider", "OpenRouter")
+            self._provider = ("Local" if data.get("offline_mode_enabled", False) else data.get("default_ai_provider", "OpenRouter"))
             self._local_url = data.get("local_ai_url", "http://localhost:11434/v1").rstrip("/")
             self._local_model = data.get("local_ai_model", "llama3.2")
         except Exception as e:

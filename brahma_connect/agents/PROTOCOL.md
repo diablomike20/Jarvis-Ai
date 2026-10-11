@@ -1,6 +1,6 @@
-# Brahma Connect Protocol
+# Jarvis AI Connect Protocol
 
-Brahma Connect uses a small JSON protocol so Brahma, companion apps, and
+Jarvis AI Connect uses a small JSON protocol so Jarvis AI, companion apps, and
 device agents can communicate consistently over WebSocket.
 
 ## Required envelope
@@ -46,10 +46,10 @@ Example:
 
 1. Agent connects and sends `hello`.
 2. Gateway responds with a pairing request or known-device instructions.
-3. User approves the device in Brahma.
+3. User approves the device in Jarvis AI.
 4. Agent sends `authenticate` with the persistent secret.
 5. Gateway marks the device online and publishes capabilities.
-6. Brahma sends `execute` requests.
+6. Jarvis AI sends `execute` requests.
 7. Agent replies with `result` or `error`.
 
 ## Notes

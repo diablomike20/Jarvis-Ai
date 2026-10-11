@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "filmcraft",
+  "name": "FilmCraft",
+  "source_url": "https://github.com/diablomike20/filmcraft",
+  "adapter": "creative_studio",
+  "enabled": true,
+  "capabilities": [
+    "Videóvágás",
+    "Idővonal",
+    "Effektek",
+    "Hangkeverés",
+    "Feliratok",
+    "Renderelés"
+  ]
+}

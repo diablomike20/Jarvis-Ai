@@ -59,7 +59,7 @@ fun ChatScreen(
             CenterAlignedTopAppBar(
                 title = { 
                     Text(
-                        "Brahma Agent", 
+                        "Jarvis AI Agent", 
                         color = Color.White, 
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleLarge
@@ -106,7 +106,7 @@ fun ChatScreen(
                         .weight(1f)
                         .clip(RoundedCornerShape(24.dp))
                         .background(Color(0xFF1A1A1A)),
-                    placeholder = { Text("Message Brahma...", color = Color.Gray) },
+                    placeholder = { Text("Message Jarvis AI...", color = Color.Gray) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = Color.Transparent,

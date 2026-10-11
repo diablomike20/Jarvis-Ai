@@ -243,7 +243,7 @@ class GmailEngine:
 class GoogleCalendarEngine:
     @classmethod
     def list_events(cls, days: int = 7) -> str:
-        """Lists events from Google Calendar if OAuth exists, or Brahma's local calendar."""
+        """Lists events from Google Calendar if OAuth exists, or Jarvis AI's local calendar."""
         # Try local calendar store first
         from actions.calendar_scheduler import calendar_scheduler
         res = calendar_scheduler({"action": "get_upcoming"})
@@ -270,7 +270,7 @@ class GoogleCalendarEngine:
 class GoogleDriveEngine:
     @classmethod
     def search_files(cls, query: str) -> str:
-        """Searches Google Drive or local Brahma AI generated files."""
+        """Searches Google Drive or local Jarvis AI generated files."""
         # Search Desktop/BrahmaAI folder
         desktop_ai = Path.home() / "Desktop" / "BrahmaAI"
         if not desktop_ai.exists():
@@ -283,7 +283,7 @@ class GoogleDriveEngine:
                 matches.append(f"- {f.name} ({round(f.stat().st_size / 1024, 1)} KB)")
 
         if matches:
-            return "Found files in Brahma Workspace:\n" + "\n".join(matches)
+            return "Found files in Jarvis AI Workspace:\n" + "\n".join(matches)
         return f"No files matching '{query}' found."
 
     @classmethod
@@ -317,7 +317,7 @@ class GoogleDriveEngine:
         try:
             import shutil
             shutil.copy2(p, dest)
-            return f"File '{p.name}' uploaded to Brahma Workspace storage."
+            return f"File '{p.name}' uploaded to Jarvis AI Workspace storage."
         except Exception as e:
             return f"Upload error: {e}"
 
@@ -379,7 +379,7 @@ def google_workspace(
 
         elif action in {"send", "compose", "draft"}:
             to = params.get("to") or params.get("receiver") or ""
-            subject = params.get("subject", "Message from Brahma AI")
+            subject = params.get("subject", "Message from Jarvis AI")
             body = params.get("body") or params.get("message") or ""
             if not to:
                 return "Recipient email address ('to') is required."

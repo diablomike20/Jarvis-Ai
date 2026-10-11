@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "example-mcp",
+  "name": "Example MCP Source",
+  "source_url": "https://github.com/OWNER/REPO",
+  "adapter": "mcp_stdio",
+  "enabled": false,
+  "executable_env": "JARVIS_EXAMPLE_MCP_CLI",
+  "args": [
+    "mcp"
+  ],
+  "capabilities": [
+    "Replace with verified source features"
+  ]
+}

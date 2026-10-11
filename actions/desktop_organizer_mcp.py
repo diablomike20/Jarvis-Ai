@@ -1,7 +1,7 @@
 from core.user_paths import get_user_data_dir
 # actions/desktop_organizer_mcp.py
 """
-Smart Desktop & Downloads Organizer MCP for Brahma AI.
+Smart Desktop & Downloads Organizer MCP for Jarvis AI.
 Provides safe, intelligent file classification, dry-run previews,
 full transaction rollback (undo), duplicate detection, and cleanup.
 """

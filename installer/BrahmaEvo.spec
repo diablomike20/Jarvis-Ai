@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata, collect_dynamic_libs
 
 cwd = os.path.abspath(os.getcwd())
 
@@ -25,7 +26,7 @@ if os.environ.get('BRAHMA_REQUIRE_CLAUDE_BUNDLE') == '1' and len(runtime_datas) 
 a = Analysis(
     [os.path.join(cwd, 'main.py')],
     pathex=[],
-    binaries=[],
+    binaries=[*collect_dynamic_libs('torchcodec')],
     datas=[
         (os.path.join(cwd, 'assets'), 'assets'),
         (os.path.join(cwd, 'config'), 'config'),
@@ -40,18 +41,58 @@ a = Analysis(
         (os.path.join(cwd, 'workspace_store.py'), '.'),
         (os.path.join(cwd, 'README.md'), '.'),
         (os.path.join(cwd, 'requirements.txt'), '.'),
-        (os.path.join(cwd, 'version.txt'), '.')
+        (os.path.join(cwd, 'version.txt'), '.'),
+        *collect_data_files('imageio_ffmpeg', includes=['binaries/*']),
+        # The *real* F5 runtime opens configs/F5TTS_v1_Base.yaml via
+        # importlib.resources. collect_submodules alone omits this YAML.
+        *collect_data_files('f5_tts'),
+        # Coqui imports TTS.vocoder.configs.__init__ and enumerates sibling .py
+        # files with os.listdir(Path(__file__).parent). PyInstaller normally
+        # keeps .py in PYZ (not on disk), causing WinError 3 at EXE startup.
+        # Ship actual source files for the installed Coqui distribution.
+        *collect_data_files('TTS', include_py_files=True),
+        # XTTS imports ko_speech_tools.g2p, which dynamically resolves
+        # importlib.resources.files('ko_speech_tools.data'). PyInstaller
+        # misses that package/data tree unless bundled explicitly.
+        *collect_data_files('ko_speech_tools', include_py_files=True),
+        # Transformers checks installed torchcodec distribution metadata at import.
+        # PyInstaller does NOT copy *.dist-info automatically, despite copying
+        # torchcodec's Python package; the frozen EXE crashed here in CI.
+        *copy_metadata('torchcodec'),
+        *copy_metadata('torch'),
+        *copy_metadata('torchaudio'),
+        *copy_metadata('transformers'),
+        *copy_metadata('f5-tts'),
+        *copy_metadata('coqui-tts'),
+        *copy_metadata('safetensors'),
+        *copy_metadata('tokenizers'),
+        *collect_data_files('torchcodec'),
+        # x-transformers defines @torch.jit.script functions (e.g. softclamp)
+        # during import. TorchScript calls inspect.getsource(), which fails
+        # against source-less modules in PyInstaller's PYZ archive.
+        # Bundle the original .py sources alongside bytecode for inspection.
+        *collect_data_files('x_transformers', include_py_files=True,
+                            includes=['**/*.py']),
+        # Coqui -> inflect -> typeguard: @typechecked introspects
+        # the original inflect.engine source during module import.
+        # The compiled PYZ contains bytecode but inspect.getsource() needs
+        # physical Python sources in _internal/inflect and _internal/typeguard.
+        *collect_data_files('inflect', include_py_files=True),
+        *collect_data_files('typeguard', include_py_files=True),
     ] + runtime_datas,
     hiddenimports=[
-        'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'PyQt6', 'PyQt6.QtWebEngineCore',
+        'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'google.generativeai', 'PyQt6', 'PyQt6.QtWebEngineCore',
         'PyQt6.QtWebEngineWidgets', 'PyQt6.QtWebChannel', 'pyautogui', 'sounddevice',
         'keyboard', 'docx', 'pptx', 'multipart', 'passlib', 'bcrypt', 'aiohttp', 'websockets',
         'uvicorn', 'fastapi', 'plyer', 'pydantic', 'typing_extensions', 'requests', 'beautifulsoup4',
-        'pyaudio', 'numpy'
+        'pyaudio', 'numpy', 'torch', 'torchaudio', 'soundfile', 'imageio_ffmpeg',
+        'huggingface_hub', 'torchcodec', *collect_submodules('torchcodec'),
+        *collect_submodules('f5_tts'), *collect_submodules('TTS'),
+        'ko_speech_tools.data', *collect_submodules('ko_speech_tools')
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[os.path.join(cwd, 'installer', 'frozen_smoke_runtime.py')],
     excludes=[],
     noarchive=False,
     optimize=0,
@@ -96,7 +137,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=os.path.join(cwd, 'assets/Brahma_Lite_Logo.ico') if os.path.exists(os.path.join(cwd, 'assets/Brahma_Lite_Logo.ico')) else None,
+    icon=os.path.join(cwd, 'assets/JARVIS_AI_Logo.ico'),
     version=os.path.join(cwd, 'version.txt') if os.path.exists(os.path.join(cwd, 'version.txt')) else None
 )
 

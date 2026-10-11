@@ -1,5 +1,5 @@
 """
-Brahma 3D HoloGlobe Window Controller.
+Jarvis AI 3D HoloGlobe Window Controller.
 Hosts the WebGL 3D Earth, Great-Circle route visualizer, and live flight radar inside a modern PyQt6 window.
 """
 
@@ -146,7 +146,7 @@ class GlobeWindow(QWidget):
         tb_layout = QHBoxLayout(title_bar)
         tb_layout.setContentsMargins(18, 0, 14, 0)
 
-        title_lbl = QLabel("🌐  BRAHMA MAPS // GEOSPATIAL INTELLIGENCE")
+        title_lbl = QLabel("🌐  JARVIS AI MAPS // GEOSPATIAL INTELLIGENCE")
         title_lbl.setStyleSheet("color: #bae6fd; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;")
         tb_layout.addWidget(title_lbl)
 

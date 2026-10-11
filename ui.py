@@ -28,7 +28,7 @@ if platform.system() == "Windows":
 
 from PyQt6.QtCore import (
     QEasingCurve, QEvent, QPoint, QPointF, QRectF, QSize, Qt,
-    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication,
+    QTimer, QUrl, QPropertyAnimation, pyqtSignal, QCoreApplication, QObject,
 )
 from PyQt6.QtGui import (
     QAction, QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
@@ -74,7 +74,7 @@ API_FILE   = CONFIG_DIR / "api_keys.json"
 APP_SETTINGS_FILE = CONFIG_DIR / "app_settings.json"
 DISCORD_SETTINGS_FILE = CONFIG_DIR / "discord_bot.json"
 LOGO_FILE  = BASE_DIR / "assets" / "Brahma_Lite_Logo.png"
-LOGO_ICO   = BASE_DIR / "assets" / "Brahma_Lite_Logo.ico"
+LOGO_ICO   = BASE_DIR / "assets" / "JARVIS_AI_Logo.ico"
 BACKGROUND_IMAGE_FILE = BASE_DIR / "assets" / "background.png"
 MODEL_DOWNLOAD_URL = "https://storage.googleapis.com/mediapipe-assets/hand_landmarker.task"
 
@@ -436,7 +436,7 @@ class RemoteKeyOverlay(QWidget):
         title.setStyleSheet("color: #ffffff; background: transparent; border: none;")
         lay.addWidget(title)
 
-        subtitle = QLabel("Scan the QR code with your phone to remotely control Brahma Evo.")
+        subtitle = QLabel("Scan the QR code with your phone to remotely control Jarvis AI.")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setWordWrap(True)
         subtitle.setFont(QFont("Segoe UI", 9))
@@ -592,7 +592,7 @@ class RemoteKeyOverlay(QWidget):
         self._qr_label.setText("OK")
         self._qr_label.setFont(QFont("Segoe UI", 34, QFont.Weight.Black))
         self._qr_label.setStyleSheet("color: #37ff5f; background: #041006; border-radius: 12px;")
-        self._timer_lbl.setText("Phone connected. Brahma Evo remote is ready.")
+        self._timer_lbl.setText("Phone connected. Jarvis AI remote is ready.")
 
     def _refresh_key(self):
         if not self._on_new_key:
@@ -685,7 +685,7 @@ class DailyBriefingOverlay(QWidget):
         hdr_info = QVBoxLayout()
         hdr_info.setSpacing(2)
 
-        title_lbl = QLabel("⚡ BRAHMA INTELLIGENCE // UNIFIED MORNING BRIEFING")
+        title_lbl = QLabel("⚡ JARVIS AI INTELLIGENCE // UNIFIED MORNING BRIEFING")
         title_lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         title_lbl.setStyleSheet(f"color: {C.PRI}; letter-spacing: 1.5px; background: transparent; border: none;")
         hdr_info.addWidget(title_lbl)
@@ -1168,7 +1168,7 @@ class MemoryInspectorOverlay(QWidget):
 
         from memory.memory_manager import all_entries_for_ui
 
-        hdr = QLabel("🧠  WHAT BRAHMA REMEMBERS")
+        hdr = QLabel("🧠  WHAT JARVIS AI REMEMBERS")
         hdr.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         hdr.setStyleSheet(f"color: {C.PRI}; background: transparent; letter-spacing: 0.5px;")
         self._lay.addWidget(hdr)
@@ -1184,7 +1184,7 @@ class MemoryInspectorOverlay(QWidget):
 
         cap = QLabel(
             f"{len(rows)} stored memory entries. Stored locally in memory/long_term.json. "
-            f"Brahma recalls these during relevant conversations."
+            f"Jarvis AI recalls these during relevant conversations."
         )
         cap.setWordWrap(True)
         cap.setFont(QFont("Segoe UI", 8))
@@ -1316,14 +1316,32 @@ def qcol(h: str, a: int = 255) -> QColor:
 
 
 def _logo_icon() -> QIcon:
-    return QIcon(str(LOGO_ICO if LOGO_ICO.exists() else LOGO_FILE))
+    # Use the exact user-approved JARVIS.ico on the taskbar, title bar and
+    # app tray as well as inside PyInstaller's Windows EXE resources.
+    if LOGO_ICO.is_file():
+        return QIcon(str(LOGO_ICO))
+    return QIcon(_logo_pixmap(128))
 
 
 def _logo_pixmap(size: int) -> QPixmap:
-    pix = QPixmap(str(LOGO_FILE))
-    if pix.isNull():
-        return QPixmap(size, size)
-    return pix.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    size = max(16, int(size))
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    try:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setBrush(QColor("#080e17"))
+        painter.setPen(QPen(QColor("#00e5ff"), max(1, size // 32)))
+        margin = max(2, size // 16)
+        painter.drawRoundedRect(margin, margin, size - 2 * margin,
+                                size - 2 * margin, size * 0.24, size * 0.24)
+        font = QFont("Segoe UI", max(8, int(size * 0.36)), QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.setPen(QColor("#f4ffff"))
+        painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "J")
+    finally:
+        painter.end()
+    return pix
 
 
 def _framed_logo(size: int, icon_size: int | None = None, *, bg: str = "rgba(18,18,18,240)",
@@ -1444,12 +1462,13 @@ def _default_app_settings() -> dict:
         "launcher_pos": None,
         "launch_minimized": False,
         "check_updates_on_startup": True,
-        "default_ai_provider": "Gemini",
+        "default_ai_provider": "OpenRouter",
         "auto_provider_switch": True,
         "attention_message_prompts": True,
         "attention_call_prompts": True,
         "developer_mode_enabled": False,
         "developer_mode_workspace": "",
+        "jarvis_voice_enabled": False,
     }
 
 
@@ -2496,7 +2515,7 @@ class TaskCard(QFrame):
         self._command_lbl.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
         lay.addWidget(self._command_lbl)
 
-        self._plan_lbl = QLabel("Plan: Brahma Evo will generate a task plan after you send a command.")
+        self._plan_lbl = QLabel("Plan: Jarvis AI will generate a task plan after you send a command.")
         self._plan_lbl.setWordWrap(True)
         self._plan_lbl.setFont(QFont("Segoe UI", 9))
         self._plan_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
@@ -2548,7 +2567,7 @@ class TaskCard(QFrame):
         self._title.setText(title)
         self._status_lbl.setText(desc)
         self._output_lbl.setText(desc)
-        self._plan_lbl.setText("Plan: Brahma Evo will generate a task plan after you send a command.")
+        self._plan_lbl.setText("Plan: Jarvis AI will generate a task plan after you send a command.")
         self._command_lbl.setText("Command: waiting for input")
         self._pct.setText(f"{percent}%")
         self._bar.setValue(max(0, min(100, percent)))
@@ -2617,7 +2636,7 @@ class TaskCard(QFrame):
         self._workspace_locked = False
         self._title.setText("Ready")
         self._command_lbl.setText("Command: waiting for input")
-        self._plan_lbl.setText("Plan: Brahma Evo will generate a task plan after you send a command.")
+        self._plan_lbl.setText("Plan: Jarvis AI will generate a task plan after you send a command.")
         self._status_lbl.setText("Status: Idle")
         self._output_lbl.setText("Output: Ready to work.")
         self._pct.setText("0%")
@@ -2867,7 +2886,7 @@ class ChatBubble(QFrame):
         if role == "assistant":
             avatar = _framed_logo(24, 24, bg="rgba(12,14,20,245)", border="rgba(0, 229, 255,0.50)", radius=12, inset=4)
             head.addWidget(avatar)
-            name_lbl = QLabel(name or "Brahma Evo")
+            name_lbl = QLabel(name or "Jarvis AI")
             name_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
             name_lbl.setStyleSheet("color: #ffffff; background: transparent;")
             head.addWidget(name_lbl)
@@ -3055,7 +3074,7 @@ class ConversationFeed(QScrollArea):
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(14, 12, 14, 12)
         lay.setSpacing(10)
-        title = QLabel("Try asking Brahma Evo")
+        title = QLabel("Try asking Jarvis AI")
         title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         title.setStyleSheet("color: #ffffff; background: transparent;")
         subtitle = QLabel("Create a presentation, analyze a screen, build a website, organize files, or run browser automation.")
@@ -3168,10 +3187,10 @@ class ConversationFeed(QScrollArea):
             attachments = msg.get("attachments") or []
             name = {
                 "user": "You",
-                "assistant": "Brahma Evo",
+                "assistant": "Jarvis AI",
                 "system": "System",
                 "file": "Files",
-            }.get(role, "Brahma Evo")
+            }.get(role, "Jarvis AI")
             self.add_message(role, name, content, stamp, attachments=attachments, animate=False)
         self._sync_empty_state()
         QTimer.singleShot(0, self.scroll_to_bottom)
@@ -3364,7 +3383,7 @@ class WorkspaceSidebar(QWidget):
 
         header = QHBoxLayout()
         header.setSpacing(10)
-        self._title = QLabel("BRAHMA EVO WORKSPACE")
+        self._title = QLabel("JARVIS AI WORKSPACE")
         self._title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         self._title.setStyleSheet("color: #FFFFFF; background: transparent; letter-spacing: 1px;")
         header.addWidget(self._title)
@@ -3527,7 +3546,7 @@ class WorkspaceSidebar(QWidget):
         input_row.addWidget(self._attach_btn)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Message Brahma Evo...")
+        self._input.setPlaceholderText("Message Jarvis AI...")
         self._input.setFont(QFont("Segoe UI", 10))
         self._input.setStyleSheet(
             f"QLineEdit {{ background: transparent; color: {C.WHITE}; border: none; padding: 2px 4px; selection-background-color: rgba(0, 229, 255, 0.25); }}"
@@ -3860,7 +3879,7 @@ class WorkspaceSidebar(QWidget):
         if not raw:
             return
         low = raw.lower()
-        if low.startswith(("you:", "brahma evo:")):
+        if low.startswith(("you:", "jarvis ai:", "brahma evo:")):
             return
         if low.startswith("sys:"):
             self.record_chat_event({"role": "system", "text": raw.split(":", 1)[1].strip(), "source": "local"})
@@ -3883,7 +3902,7 @@ class WorkspaceSidebar(QWidget):
         elif role == "assistant":
             convo_id = self._store.record_chat("assistant", text, conversation_id=convo_id, attachments=attachments)
             self._active_conversation_id = convo_id
-            self._feed.add_message("assistant", "Brahma Evo", text, _fmt_time_stamp(stamp), attachments=attachments, animate=True)
+            self._feed.add_message("assistant", "Jarvis AI", text, _fmt_time_stamp(stamp), attachments=attachments, animate=True)
             self._hide_memory_banner()
         elif role == "system":
             convo_id = self._store.record_chat("system", text, conversation_id=convo_id, attachments=attachments)
@@ -4113,7 +4132,7 @@ class InlineChatWorkspace(QFrame):
         input_row.addWidget(self._attach_btn)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Message Brahma Evo...")
+        self._input.setPlaceholderText("Message Jarvis AI...")
         self._input.setFont(QFont("Segoe UI", 10))
         self._input.setStyleSheet(
             f"QLineEdit {{ background: transparent; color: {C.WHITE}; border: none; padding: 0 4px; selection-background-color: rgba(0, 229, 255, 0.25); }}"
@@ -4147,7 +4166,7 @@ class InlineChatWorkspace(QFrame):
 
         footer = QHBoxLayout()
         footer.setContentsMargins(4, 2, 4, 2)
-        self._footer_status = QLabel("Brahma Evo is ready")
+        self._footer_status = QLabel("Jarvis AI is ready")
         self._footer_status.setFont(QFont("Segoe UI", 8))
         self._footer_status.setStyleSheet("color: rgba(255, 255, 255, 0.55); background: transparent;")
         footer.addWidget(self._footer_status)
@@ -4164,12 +4183,12 @@ class InlineChatWorkspace(QFrame):
         if hasattr(self, "_footer_status") and self._footer_status:
             status_text = {
                 "listening": "Listening to your voice...",
-                "speaking": "Brahma Evo is speaking...",
+                "speaking": "Jarvis AI is speaking...",
                 "thinking": "Synthesizing response...",
                 "executing": "Executing task...",
                 "working": "Processing request...",
                 "muted": "Microphone muted",
-            }.get((state or "").lower(), "Brahma Evo is ready")
+            }.get((state or "").lower(), "Jarvis AI is ready")
             self._footer_status.setText(status_text)
 
     def _build_history_tab(self) -> QWidget:
@@ -4294,7 +4313,7 @@ class InlineChatWorkspace(QFrame):
             self._show_memories(self._store.search_memories(text))
         elif role == "assistant":
             self._store.record_chat("assistant", text, conversation_id=convo_id, attachments=attachments)
-            self._feed.add_message("assistant", "Brahma Evo", text, stamp, attachments=attachments)
+            self._feed.add_message("assistant", "Jarvis AI", text, stamp, attachments=attachments)
             self._hide_memories()
         elif role == "system":
             self._store.record_chat("system", text, conversation_id=convo_id, attachments=attachments)
@@ -4311,7 +4330,7 @@ class InlineChatWorkspace(QFrame):
         low = raw.lower()
         if low.startswith("you:"):
             self.record_chat_event({"role": "user", "text": raw.split(":", 1)[1].strip()})
-        elif low.startswith("brahma evo:"):
+        elif low.startswith(("jarvis ai:", "brahma evo:")):
             self.record_chat_event({"role": "assistant", "text": raw.split(":", 1)[1].strip()})
         elif low.startswith("sys:"):
             self.record_chat_event({"role": "system", "text": raw.split(":", 1)[1].strip()})
@@ -4422,7 +4441,7 @@ class LauncherControlPanel(QDialog):
         lay.setContentsMargins(18, 16, 18, 16)
         lay.setSpacing(10)
 
-        title = QLabel("BRAHMA EVO CONTROL")
+        title = QLabel("JARVIS AI CONTROL")
         title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         title.setStyleSheet("color: #FFFFFF; background: transparent; letter-spacing: 1px;")
         lay.addWidget(title)
@@ -4464,8 +4483,8 @@ class LauncherControlPanel(QDialog):
         self._startup_btn = mk_btn("Show Workspace On Startup", checkable=True, checked=bool(startup_workspace))
         self._show_icon_btn = mk_btn("Show Floating Icon")
         self._hide_icon_btn = mk_btn("Hide Floating Icon")
-        self._restart_btn = mk_btn("Restart Brahma Evo")
-        self._quit_btn = mk_btn("Quit Brahma Evo")
+        self._restart_btn = mk_btn("Restart Jarvis AI")
+        self._quit_btn = mk_btn("Quit Jarvis AI")
         self._open_app_btn = mk_btn("Open App")
         self._open_dev_btn = mk_btn("Open Developer Mode")
 
@@ -4508,7 +4527,7 @@ class LauncherControlPanel(QDialog):
         flay = QVBoxLayout(frame)
         flay.setContentsMargins(18, 16, 18, 16)
         flay.setSpacing(10)
-        lbl = QLabel("Hide Brahma Evo icon?")
+        lbl = QLabel("Hide Jarvis AI icon?")
         lbl.setStyleSheet("color: #FFFFFF; background: transparent; font: 700 11pt 'Segoe UI';")
         sub = QLabel("You can restore it from the system tray.")
         sub.setStyleSheet("color: rgba(255,255,255,0.65); background: transparent;")
@@ -4568,7 +4587,7 @@ class SmallPanelCard(QFrame):
 
 class BrahmaTelemetryWing(QFrame):
     """
-    Brahma Right Wing: Live Operations, Research Streams, and Sources.
+    Jarvis AI Right Wing: Live Operations, Research Streams, and Sources.
     Auto-dismisses in 10 seconds unless pinned or hovered.
     Adapts dynamically to the active theme color (Amber Gold by default).
     """
@@ -4881,7 +4900,7 @@ class BrahmaTelemetryWing(QFrame):
 
 class BrahmaResultWing(QFrame):
     """
-    Brahma Left Wing: Final Results, Generated Deliverables (PDF/Word/Media/Code),
+    Jarvis AI Left Wing: Final Results, Generated Deliverables (PDF/Word/Media/Code),
     Executive Summary Bullets, and Quick Action Buttons.
     Auto-dismisses in 10 seconds unless pinned or hovered.
     Adapts dynamically to the active theme color (Amber Gold by default).
@@ -5382,10 +5401,10 @@ class LogWidget(QScrollArea):
         tl = raw.lower()
         if tl.startswith("you:"):
             return "user", "You", raw[4:].strip()
-        if tl.startswith("brahma evo:"):
-            return "assistant", "Brahma Evo", raw[len("Brahma Evo:"):].strip()
-        if tl.startswith("brahma evo:"):
-            return "assistant", "Brahma Evo", raw[len("Brahma Evo:"):].strip()
+        if tl.startswith(("jarvis ai:", "brahma evo:")):
+            return "assistant", "Jarvis AI", raw.split(":", 1)[1].strip()
+        if tl.startswith(("jarvis ai:", "brahma evo:")):
+            return "assistant", "Jarvis AI", raw.split(":", 1)[1].strip()
         if tl.startswith("file:"):
             return "file", "File", raw[5:].strip()
         if tl.startswith("err:"):
@@ -5490,7 +5509,7 @@ class FileDropZone(QWidget):
 
     def _browse(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select a file for Brahma Evo", str(Path.home()),
+            self, "Select a file for Jarvis AI", str(Path.home()),
             "All Files (*.*);;"
             "Images (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
             "Documents (*.pdf *.docx *.txt *.md *.pptx);;"
@@ -5806,8 +5825,8 @@ class SetupOverlay(QWidget):
         self._stack.addWidget(page)
 
     def _save_identity_and_next(self):
-        identity.set_assistant_name(self._inp_ast.text().strip() or "Brahma")
-        identity.set_application_name(self._inp_app.text().strip() or "Brahma Evo")
+        identity.set_assistant_name(self._inp_ast.text().strip() or "Jarvis AI")
+        identity.set_application_name(self._inp_app.text().strip() or "Jarvis AI")
         self._stack.setCurrentIndex(2)
 
     # ── STAGE 1.2: Owner Profile ────────────────────────────────
@@ -5977,7 +5996,7 @@ class SetupOverlay(QWidget):
         cards_lay.setSpacing(20)
         cards_lay.addStretch()
 
-        # ── Gemini Card ──
+        # ── OpenRouter Card ──
         gem_card = QFrame()
         gem_card.setFixedSize(260, 160)
         gem_card.setStyleSheet("""
@@ -5996,7 +6015,7 @@ class SetupOverlay(QWidget):
         glay.setContentsMargins(22, 18, 22, 18)
         glay.setSpacing(4)
 
-        gt = QLabel("Google Gemini")
+        gt = QLabel("OpenRouter")
         gt.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
         gt.setStyleSheet("color: #00e5ff; background: transparent; border: none;")
         glay.addWidget(gt)
@@ -6027,48 +6046,6 @@ class SetupOverlay(QWidget):
 
         cards_lay.addWidget(gem_card)
 
-        # ── OpenRouter Card ──
-        or_card = QFrame()
-        or_card.setFixedSize(260, 160)
-        or_card.setStyleSheet("""
-            QFrame {
-                background: rgba(255, 255, 255, 0.02);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 16px;
-            }
-            QFrame:hover {
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            }
-        """)
-        or_card.setCursor(Qt.CursorShape.PointingHandCursor)
-        olay = QVBoxLayout(or_card)
-        olay.setContentsMargins(22, 18, 22, 18)
-        olay.setSpacing(4)
-
-        ot = QLabel("OpenRouter")
-        ot.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
-        ot.setStyleSheet("color: rgba(255,255,255,0.8); background: transparent; border: none;")
-        olay.addWidget(ot)
-
-        od = QLabel("Multiple Models")
-        od.setFont(QFont("Segoe UI", 9))
-        od.setStyleSheet("color: rgba(255,255,255,0.3); background: transparent; border: none;")
-        olay.addWidget(od)
-
-        od2 = QLabel("Optional · Secondary")
-        od2.setFont(QFont("Segoe UI", 9))
-        od2.setStyleSheet("color: rgba(255,255,255,0.2); background: transparent; border: none;")
-        olay.addWidget(od2)
-
-        olay.addStretch()
-
-        oc = QLabel("Configure Later →")
-        oc.setFont(QFont("Segoe UI", 11))
-        oc.setStyleSheet("color: rgba(255,255,255,0.35); background: transparent; border: none;")
-        olay.addWidget(oc)
-
-        cards_lay.addWidget(or_card)
         cards_lay.addStretch()
 
         lay.addLayout(cards_lay)
@@ -6101,7 +6078,7 @@ class SetupOverlay(QWidget):
         blay.setContentsMargins(32, 28, 32, 28)
         blay.setSpacing(6)
 
-        self._s3_title = QLabel("Google Gemini")
+        self._s3_title = QLabel("OpenRouter")
         self._s3_title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         self._s3_title.setStyleSheet("color: #00e5ff; background: transparent; border: none;")
         blay.addWidget(self._s3_title)
@@ -6135,7 +6112,7 @@ class SetupOverlay(QWidget):
                 background: rgba(0, 229, 255, 0.06);
             }
         """)
-        self._key_input.setText((self._defaults.get("gemini_api_key") or "").strip())
+        self._key_input.setText((self._defaults.get("openrouter_api_key") or "").strip())
         self._key_input.textChanged.connect(self._on_key_changed)
         input_row.addWidget(self._key_input)
 
@@ -6161,7 +6138,7 @@ class SetupOverlay(QWidget):
 
         status_row.addStretch()
 
-        hint = QLabel("<a href='https://aistudio.google.com/app/apikey' style='color: rgba(0, 229, 255,0.5); text-decoration: none; font-size: 10px;'>Get API Key →</a>")
+        hint = QLabel("<a href='https://openrouter.ai/settings/keys' style='color: rgba(0, 229, 255,0.5); text-decoration: none; font-size: 10px;'>Get API Key →</a>")
         hint.setOpenExternalLinks(True)
         hint.setStyleSheet("background: transparent; border: none;")
         status_row.addWidget(hint)
@@ -6191,10 +6168,10 @@ class SetupOverlay(QWidget):
         intro_lay.setSpacing(12)
 
         self._intro_lines = []
-        for txt in ["Identity confirmed.", "Hello.", "I'm Brahma Evo.", "Ready whenever you are."]:
+        for txt in ["Identity confirmed.", "Hello.", "I'm Jarvis AI.", "Ready whenever you are."]:
             lbl = QLabel(txt)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            if txt == "I'm Brahma Evo.":
+            if txt == "I'm Jarvis AI.":
                 lbl.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
                 lbl.setStyleSheet("color: #00e5ff; background: transparent; border: none;")
             else:
@@ -6206,7 +6183,7 @@ class SetupOverlay(QWidget):
 
         intro_lay.addSpacing(20)
 
-        self._launch_btn = QPushButton("Launch Brahma Evo →")
+        self._launch_btn = QPushButton("Launch Jarvis AI →")
         self._launch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._launch_btn.setFixedSize(220, 48)
         self._launch_btn.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
@@ -6254,11 +6231,11 @@ class SetupOverlay(QWidget):
             self._auth_step += 1
         else:
             self._auth_timer.stop()
-            self._s3_status.setText("✓ Identity Verified")
+            self._s3_status.setText("✓ API key entered (not verified)")
             self._s3_status.setStyleSheet("color: #37ff5f; background: transparent; border: none;")
-            self._s3_title.setText("✓ Google Gemini")
+            self._s3_title.setText("✓ OpenRouter")
             self._s3_title.setStyleSheet("color: #37ff5f; background: transparent; border: none;")
-            self._s3_sub.setText("Gemini 2.5 Pro  ·  Ready")
+            self._s3_sub.setText("OpenRouter key saved  ·  Verified on first request")
             self._s3_sub.setStyleSheet("color: rgba(55,255,95,0.6); background: transparent; border: none;")
             self._key_input.setStyleSheet("""
                 QLineEdit {
@@ -6276,7 +6253,7 @@ class SetupOverlay(QWidget):
                     border-radius: 20px;
                 }
             """)
-            QTimer.singleShot(1800, self._show_or_prompt)
+            QTimer.singleShot(300, self._finish_single_provider_setup)
 
 
     def _start_openrouter_only_setup(self):
@@ -6285,184 +6262,10 @@ class SetupOverlay(QWidget):
         self._or_prompt_widget = self._s3_box
         self._show_or_input()
 
-    def _show_or_prompt(self):
-        """After Gemini verified, ask if user wants to add OpenRouter too."""
+    def _finish_single_provider_setup(self):
+        """Only one cloud provider remains; skip the obsolete second key form."""
         self._s3_box.hide()
-        page = self._stack.widget(6)
-        lay = page.layout()
-
-        self._or_prompt_widget = QFrame()
-        self._or_prompt_widget.setFixedSize(460, 200)
-        self._or_prompt_widget.setStyleSheet("""
-            QFrame {
-                background: rgba(8, 10, 16, 220);
-                border: 1px solid rgba(0, 229, 255, 0.15);
-                border-radius: 20px;
-            }
-        """)
-        prom_lay = QVBoxLayout(self._or_prompt_widget)
-        prom_lay.setContentsMargins(32, 28, 32, 24)
-        prom_lay.setSpacing(8)
-
-        q_title = QLabel("Secondary Intelligence")
-        q_title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-        q_title.setStyleSheet("color: #ffffff; background: transparent; border: none;")
-        prom_lay.addWidget(q_title)
-
-        q_sub = QLabel("Would you like to configure OpenRouter as well?\nThis is optional and can be done later in Settings.")
-        q_sub.setFont(QFont("Segoe UI", 10))
-        q_sub.setWordWrap(True)
-        q_sub.setStyleSheet("color: rgba(255,255,255,0.4); background: transparent; border: none;")
-        prom_lay.addWidget(q_sub)
-
-        prom_lay.addStretch()
-
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(12)
-
-        skip_btn = QPushButton("Skip")
-        skip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        skip_btn.setFixedHeight(42)
-        skip_btn.setFont(QFont("Segoe UI", 11))
-        skip_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: rgba(255,255,255,0.4);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 12px;
-                padding: 0 24px;
-            }
-            QPushButton:hover {
-                color: rgba(255,255,255,0.7);
-                border: 1px solid rgba(255,255,255,0.25);
-            }
-        """)
-        skip_btn.clicked.connect(self._skip_or)
-        btn_row.addWidget(skip_btn)
-
-        yes_btn = QPushButton("Configure OpenRouter")
-        yes_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        yes_btn.setFixedHeight(42)
-        yes_btn.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        yes_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(0, 229, 255, 0.1);
-                color: #00e5ff;
-                border: 1px solid rgba(0, 229, 255, 0.35);
-                border-radius: 12px;
-                padding: 0 24px;
-            }
-            QPushButton:hover {
-                background: rgba(0, 229, 255, 0.2);
-                border: 1px solid rgba(0, 229, 255, 0.6);
-            }
-        """)
-        yes_btn.clicked.connect(self._show_or_input)
-        btn_row.addWidget(yes_btn)
-
-        prom_lay.addLayout(btn_row)
-
-        lay.insertWidget(lay.count() - 1, self._or_prompt_widget, 0, Qt.AlignmentFlag.AlignCenter)
-
-    def _skip_or(self):
-        """User chose to skip OpenRouter, go to color selection."""
         self._or_key_value = ""
-        self._or_prompt_widget.hide()
-        self._show_color_stage()
-
-    def _show_or_input(self):
-        """User wants to add OpenRouter."""
-        self._or_prompt_widget.hide()
-        page = self._stack.widget(6)
-        lay = page.layout()
-
-        self._or_box = QFrame()
-        self._or_box.setFixedSize(480, 230)
-        self._or_box.setStyleSheet("""
-            QFrame {
-                background: rgba(8, 10, 16, 220);
-                border: 1px solid rgba(0, 229, 255, 0.2);
-                border-radius: 20px;
-            }
-        """)
-        or_blay = QVBoxLayout(self._or_box)
-        or_blay.setContentsMargins(32, 28, 32, 28)
-        or_blay.setSpacing(6)
-
-        or_title = QLabel("OpenRouter")
-        or_title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        or_title.setStyleSheet("color: rgba(255,255,255,0.8); background: transparent; border: none;")
-        or_blay.addWidget(or_title)
-
-        or_sub = QLabel("Paste your OpenRouter API Key")
-        or_sub.setFont(QFont("Segoe UI", 10))
-        or_sub.setStyleSheet("color: rgba(255,255,255,0.4); background: transparent; border: none;")
-        or_blay.addWidget(or_sub)
-
-        or_blay.addSpacing(12)
-
-        self._or_input = QLineEdit()
-        self._or_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._or_input.setPlaceholderText("sk-or-************************")
-        self._or_input.setFont(QFont("Consolas", 12))
-        self._or_input.setFixedHeight(48)
-        self._or_input.setStyleSheet("""
-            QLineEdit {
-                background: rgba(255, 255, 255, 0.03);
-                color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 12px;
-                padding: 0 16px;
-                letter-spacing: 1px;
-            }
-            QLineEdit:focus {
-                border: 1px solid rgba(0, 229, 255, 0.5);
-            }
-        """)
-        self._or_input.setText((self._defaults.get("openrouter_api_key") or "").strip())
-        or_blay.addWidget(self._or_input)
-
-        or_blay.addStretch()
-
-        or_btn_row = QHBoxLayout()
-        or_skip = QPushButton("Skip")
-        or_skip.setCursor(Qt.CursorShape.PointingHandCursor)
-        or_skip.setFixedHeight(42)
-        or_skip.setFont(QFont("Segoe UI", 11))
-        or_skip.setStyleSheet("""
-            QPushButton { background: transparent; color: rgba(255,255,255,0.4); border: none; }
-            QPushButton:hover { color: rgba(255,255,255,0.7); }
-        """)
-        or_skip.clicked.connect(self._skip_or)
-        or_btn_row.addWidget(or_skip)
-
-        or_save = QPushButton("Save & Continue")
-        or_save.setCursor(Qt.CursorShape.PointingHandCursor)
-        or_save.setFixedHeight(42)
-        or_save.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        or_save.setStyleSheet("""
-            QPushButton {
-                background: rgba(0, 229, 255, 0.1);
-                color: #00e5ff;
-                border: 1px solid rgba(0, 229, 255, 0.35);
-                border-radius: 12px;
-                padding: 0 24px;
-            }
-            QPushButton:hover {
-                background: rgba(0, 229, 255, 0.2);
-                border: 1px solid rgba(0, 229, 255, 0.6);
-            }
-        """)
-        or_save.clicked.connect(self._save_or_key)
-        or_btn_row.addWidget(or_save)
-
-        or_blay.addLayout(or_btn_row)
-
-        lay.insertWidget(lay.count() - 1, self._or_box, 0, Qt.AlignmentFlag.AlignCenter)
-
-    def _save_or_key(self):
-        self._or_key_value = self._or_input.text().strip()
-        self._or_box.hide()
         self._show_color_stage()
 
     def _show_color_stage(self):
@@ -6559,7 +6362,7 @@ class SetupOverlay(QWidget):
         self._show_intro_final()
 
     def _show_intro_final(self):
-        """Show the Brahma Evo intro sequence."""
+        """Show the Jarvis AI intro sequence."""
         page = self._stack.widget(6)
         lay = page.layout()
         self._intro_widget.setParent(None)
@@ -6723,7 +6526,7 @@ class CommandBar(QWidget):
         lay.setContentsMargins(6, 4, 6, 4)
         lay.setSpacing(6)
 
-        # Brahma Evo mini logo
+        # Jarvis AI mini logo
         logo_frame = QFrame()
         logo_frame.setFixedSize(32, 32)
         logo_frame.setStyleSheet("""
@@ -6744,7 +6547,7 @@ class CommandBar(QWidget):
 
         # Input field
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Tell Brahma Evo what to do...")
+        self._input.setPlaceholderText("Tell Jarvis AI what to do...")
         self._input.setFont(QFont("Segoe UI", 9))
         self._input.setFixedHeight(32)
         self._input.setStyleSheet(f"""
@@ -6924,7 +6727,7 @@ class DeveloperModeDialog(QDialog):
         title.setStyleSheet(f"color: {C.PRI};")
         root.addWidget(title)
 
-        desc = QLabel("Pick a workspace folder Brahma Evo should use when building websites or other workspace-based tasks.")
+        desc = QLabel("Pick a workspace folder Jarvis AI should use when building websites or other workspace-based tasks.")
         desc.setWordWrap(True)
         desc.setStyleSheet(f"color: {C.TEXT_DIM};")
         root.addWidget(desc)
@@ -7651,7 +7454,7 @@ class BootSequenceOverlay(QWidget):
                     painter.drawEllipse(QPointF(s['x'], s['y']), s['size'], s['size'])
 
             # -------------------------------------------------------------
-            # 3. DRAW "BRAHMA" TEXT & TYPOGRAPHY EFFECT
+            # 3. DRAW "JARVIS AI" TEXT & TYPOGRAPHY EFFECT
             # -------------------------------------------------------------
             if self._time >= 1.35:
                 text_t = min(1.0, (self._time - 1.35) / 0.45)
@@ -7670,7 +7473,7 @@ class BootSequenceOverlay(QWidget):
                 glow_col = QColor(0, 240, 255, int(text_alpha * 0.45))
                 painter.setPen(glow_col)
                 for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, 1)]:
-                    painter.drawText(rect_brahma.translated(ox, oy), Qt.AlignmentFlag.AlignCenter, "BRAHMA")
+                    painter.drawText(rect_brahma.translated(ox, oy), Qt.AlignmentFlag.AlignCenter, "JARVIS AI")
 
                 # Core white text with dynamic shimmer
                 if 1.8 <= self._time < 2.5:
@@ -7685,7 +7488,7 @@ class BootSequenceOverlay(QWidget):
                 else:
                     painter.setPen(QColor(255, 255, 255, text_alpha))
 
-                painter.drawText(rect_brahma, Qt.AlignmentFlag.AlignCenter, "BRAHMA")
+                painter.drawText(rect_brahma, Qt.AlignmentFlag.AlignCenter, "JARVIS AI")
 
             # -------------------------------------------------------------
             # 4. DRAW "AI - EVO" WITH MAXIMUM IMPACT (>= 2.5s)
@@ -7991,7 +7794,7 @@ class MeetingOverlay(QWidget):
         self._speech.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
         lay.addWidget(self._speech)
 
-        self._answer = QLabel("Brahma Evo will show the live answer here.")
+        self._answer = QLabel("Jarvis AI will show the live answer here.")
         self._answer.setWordWrap(True)
         self._answer.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         self._answer.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
@@ -8321,7 +8124,7 @@ class FloatingLauncher(QWidget):
 
     def _apply_state_style(self):
         self.setToolTip(
-            f"Brahma Evo ({self._status_line})\n"
+            f"Jarvis AI ({self._status_line})\n"
             "• Single-click: Chat Workspace\n"
             "• Double-click: Open Full App\n"
             "• Drag: Move (Spring Snap)"
@@ -8355,7 +8158,7 @@ class FloatingLauncher(QWidget):
             }}
         """)
 
-        open_full = QAction("Open Brahma Evo (Full App)", self)
+        open_full = QAction("Open Jarvis AI (Full App)", self)
         open_full.triggered.connect(lambda: self.action_requested.emit("open_app"))
         menu.addAction(open_full)
 
@@ -8379,7 +8182,7 @@ class FloatingLauncher(QWidget):
         hide_act.triggered.connect(self.hide)
         menu.addAction(hide_act)
 
-        quit_act = QAction("Quit Brahma", self)
+        quit_act = QAction("Quit Jarvis AI", self)
         quit_act.triggered.connect(lambda: self.action_requested.emit("quit"))
         menu.addAction(quit_act)
 
@@ -8546,7 +8349,7 @@ class MainWindow(QMainWindow):
         self.setWindowFlag(Qt.WindowType.Tool, False)
         self.setWindowFlag(Qt.WindowType.Window, True)
         self.setWindowIcon(self._make_window_icon())
-        self.setWindowTitle("Brahma Evo")
+        self.setWindowTitle("Jarvis AI")
         self.setMinimumSize(_MIN_W, _MIN_H)
         self.resize(_DEFAULT_W, _DEFAULT_H)
 
@@ -8880,7 +8683,6 @@ class MainWindow(QMainWindow):
     def _load_api_defaults(self) -> dict:
         if not API_FILE.exists():
             return {
-                "gemini_api_key": "",
                 "openrouter_api_key": "",
                 "anthropic_api_key": "",
                 "os_system": platform.system(),
@@ -8893,7 +8695,6 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         return {
-            "gemini_api_key": "",
             "openrouter_api_key": "",
             "anthropic_api_key": "",
             "os_system": platform.system(),
@@ -8910,10 +8711,10 @@ class MainWindow(QMainWindow):
                 winreg.KEY_READ | winreg.KEY_WRITE,
             ) as key:
                 try:
-                    value, _ = winreg.QueryValueEx(key, "Brahma Evo")
+                    value, _ = winreg.QueryValueEx(key, "Jarvis AI")
                     run_value = _startup_run_value()
                     if value != run_value:
-                        winreg.SetValueEx(key, "Brahma Evo", 0, winreg.REG_SZ, run_value)
+                        winreg.SetValueEx(key, "Jarvis AI", 0, winreg.REG_SZ, run_value)
                     return bool(value)
                 except FileNotFoundError:
                     return False
@@ -8927,10 +8728,10 @@ class MainWindow(QMainWindow):
         try:
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _startup_registry_key()) as key:
                 if enabled:
-                    winreg.SetValueEx(key, "Brahma Evo", 0, winreg.REG_SZ, run_value)
+                    winreg.SetValueEx(key, "Jarvis AI", 0, winreg.REG_SZ, run_value)
                 else:
                     try:
-                        winreg.DeleteValue(key, "Brahma Evo")
+                        winreg.DeleteValue(key, "Jarvis AI")
                     except FileNotFoundError:
                         pass
             return True
@@ -9220,7 +9021,7 @@ class MainWindow(QMainWindow):
 
     def _browse_attachment(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Attach a file to Brahma Evo", str(Path.home()),
+            self, "Attach a file to Jarvis AI", str(Path.home()),
             "All Files (*.*);;"
             "Images (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
             "Documents (*.pdf *.docx *.txt *.md *.pptx);;"
@@ -9322,7 +9123,7 @@ class MainWindow(QMainWindow):
                     self.on_chat_event({"role": "user", "text": user_msg, "source": source})
                 except Exception:
                     pass
-        if hasattr(self, "_result_card") and low.startswith("brahma evo:"):
+        if hasattr(self, "_result_card") and low.startswith(("jarvis ai:", "brahma evo:")):
             reply = raw.split(":", 1)[1].strip()
             self._result_card.set_body(reply[:80] + ("…" if len(reply) > 80 else ""))
             self._result_card.hide()
@@ -9526,7 +9327,7 @@ class MainWindow(QMainWindow):
             self._call_screening_dialog.close()
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("Brahma Evo Call Screening")
+        dialog.setWindowTitle("Jarvis AI Call Screening")
         dialog.setModal(False)
         dialog.setMinimumWidth(380)
         layout = QVBoxLayout(dialog)
@@ -9670,7 +9471,7 @@ class MainWindow(QMainWindow):
     def notify_phone_connected(self):
         if self._remote_overlay is not None:
             self._remote_overlay.mark_connected()
-        self._log_sig.emit("SYS: Phone connected to Brahma Evo remote.")
+        self._log_sig.emit("SYS: Phone connected to Jarvis AI remote.")
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -9737,21 +9538,21 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_input"):
             ph_map = {
                 "LISTENING": "Listening... (or type your command)",
-                "SPEAKING": "Brahma Evo is responding...",
-                "THINKING": "Brahma is thinking...",
+                "SPEAKING": "Jarvis AI is responding...",
+                "THINKING": "Jarvis AI is thinking...",
                 "PROCESSING": "Processing request...",
                 "EXECUTING": "Executing action...",
                 "WORKING": "Working on it...",
                 "MUTED": "Microphone muted — type command here...",
                 "SCANNING": "Scanning display...",
             }
-            self._input.setPlaceholderText(ph_map.get(state, "Ask Brahma Evo anything..."))
+            self._input.setPlaceholderText(ph_map.get(state, "Ask Jarvis AI anything..."))
 
         # Update chat workspace footer status
         if hasattr(self, "_inline_workspace") and hasattr(self._inline_workspace, "_footer_status"):
             foot_map = {
                 "LISTENING": "● Listening for voice command...",
-                "SPEAKING": "● Brahma is speaking...",
+                "SPEAKING": "● Jarvis AI is speaking...",
                 "THINKING": "● Thinking...",
                 "PROCESSING": "● Processing...",
                 "EXECUTING": "● Executing system command...",
@@ -9759,7 +9560,7 @@ class MainWindow(QMainWindow):
                 "MUTED": "● Voice input muted",
                 "SCANNING": "● Vision system active",
             }
-            self._inline_workspace._footer_status.setText(foot_map.get(state, "Brahma Evo is online"))
+            self._inline_workspace._footer_status.setText(foot_map.get(state, "Jarvis AI is online"))
 
         if hasattr(self, "_status_chip"):
             chip_text = {
@@ -9785,13 +9586,13 @@ class MainWindow(QMainWindow):
             )
         if hasattr(self, "_task_card"):
             if state in ("THINKING", "PROCESSING", "EXECUTING", "WORKING"):
-                self._task_card.set_task("Working on it...", "Brahma Evo is processing your request.", 72)
+                self._task_card.set_task("Working on it...", "Jarvis AI is processing your request.", 72)
             elif state == "SPEAKING":
-                self._task_card.set_task("Responding...", "Brahma Evo is speaking now.", 100)
+                self._task_card.set_task("Responding...", "Jarvis AI is speaking now.", 100)
             elif state == "MUTED":
                 self._task_card.set_task("Microphone muted", "Voice input is paused.", 0)
             else:
-                self._task_card.set_task("Ready", "Brahma Evo is idle and ready.", 0)
+                self._task_card.set_task("Ready", "Jarvis AI is idle and ready.", 0)
         if hasattr(self, "_result_card"):
             if state in ("THINKING", "PROCESSING", "EXECUTING", "WORKING"):
                 self._result_card.set_body("Action pending")
@@ -9811,8 +9612,8 @@ class MainWindow(QMainWindow):
         try:
             from core.ai_startup import has_ai_credentials
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
-            return has_ai_credentials(d)
-        except (OSError, ValueError):
+            return bool(d.get("openrouter_api_key")) or bool(self._load_app_settings().get("offline_mode_enabled", False))
+        except Exception:
             return False
 
     def _apply_scan_state(self, enabled: bool, text: str = ""):
@@ -10030,8 +9831,7 @@ class MainWindow(QMainWindow):
             existing = self._load_api_defaults()
             API_FILE.write_text(
                 json.dumps({
-                    "gemini_api_key":    key,
-                    "openrouter_api_key": or_key,
+                    "openrouter_api_key": or_key or key,
                     "anthropic_api_key": existing.get("anthropic_api_key", ""),
                     "os_system":         os_name,
                 }, indent=4),
@@ -10056,7 +9856,7 @@ class MainWindow(QMainWindow):
                 self._floating_gesture_card.show()
             self.showNormal()
             self._apply_state("LISTENING")
-            self._log.append_log(f"SYS: Initialised. OS={os_name.upper()}. Brahma Evo online.")
+            self._log.append_log(f"SYS: Initialised. OS={os_name.upper()}. Jarvis AI online.")
         except Exception as e:
             self._log.append_log(f"ERR: setup failed: {e}")
             traceback.print_exc()
@@ -10181,7 +9981,7 @@ class MainWindow(QMainWindow):
         pulse_dot.setStyleSheet("color: #37ff5f; background: transparent;")
         header_bar.addWidget(pulse_dot)
 
-        header_title = QLabel("BRAHMA CHAT")
+        header_title = QLabel("JARVIS AI CHAT")
         header_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         header_title.setStyleSheet(f"color: {C.WHITE}; background: transparent; letter-spacing: 1px;")
         header_bar.addWidget(header_title)
@@ -10271,7 +10071,7 @@ class MainWindow(QMainWindow):
         row.setSpacing(12)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Ask Brahma Evo anything...")
+        self._input.setPlaceholderText("Ask Jarvis AI anything...")
         self._input.setFont(QFont("Segoe UI", 10))
         self._input.setFixedHeight(50)
         self._input.setStyleSheet(f"""
@@ -10435,7 +10235,7 @@ class SystemConnectivitySidebar(QFrame):
         self._quick_actions = QVBoxLayout()
         self._quick_actions.setSpacing(10)
         lay.addLayout(self._quick_actions)
-        self._mk_quick_action("Γå╗ Restart Brahma Evo", QStyle.StandardPixmap.SP_BrowserReload, self._restart)
+        self._mk_quick_action("Γå╗ Restart Jarvis AI", QStyle.StandardPixmap.SP_BrowserReload, self._restart)
         self._mk_quick_action("Γƒ│ Reload Configuration", QStyle.StandardPixmap.SP_BrowserReload, self._reload)
         self._mk_quick_action("≡ƒôü Open Data Folder", QStyle.StandardPixmap.SP_DirOpenIcon, self._open_data_folder)
         self._mk_quick_action("≡ƒôä View Logs", QStyle.StandardPixmap.SP_FileDialogDetailedView, self._view_logs)
@@ -10506,7 +10306,7 @@ class SystemConnectivitySidebar(QFrame):
         if self._bridge() and hasattr(self._bridge(), "_win"):
             version = "v1.0.0"
             platform_name = platform.system()
-            provider = self._bridge()._win._load_app_settings().get("default_ai_provider", "Gemini")
+            provider = self._bridge()._win._load_app_settings().get("default_ai_provider", "OpenRouter")
             last_updated = time.strftime("%d %b %Y %H:%M")
             self._info_rows["Version"].setText(version)
             self._info_rows["Platform"].setText(platform_name)
@@ -10515,7 +10315,7 @@ class SystemConnectivitySidebar(QFrame):
         else:
             self._info_rows["Version"].setText("v1.0.0")
             self._info_rows["Platform"].setText(platform.system())
-            self._info_rows["Current AI Provider"].setText("Gemini")
+            self._info_rows["Current AI Provider"].setText("OpenRouter")
             self._info_rows["Last Updated"].setText(time.strftime("%d %b %Y %H:%M"))
 
 
@@ -10534,7 +10334,7 @@ class SettingsHubPage(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(title)
 
-        subtitle = QLabel("Select a section below to configure your Brahma Evo environment.")
+        subtitle = QLabel("Select a section below to configure your Jarvis AI environment.")
         subtitle.setFont(QFont("Segoe UI", 12))
         subtitle.setStyleSheet(f"color: {C.TEXT_DIM};")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -10545,7 +10345,7 @@ class SettingsHubPage(QWidget):
         cards_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         cards_data = [
-            ("Brahma Evo Home", "Configure smart home integrations", "🏠", 1),
+            ("Jarvis AI Home", "Configure smart home integrations", "🏠", 1),
             ("Devices", "Manage and control connected hardware", "🔌", 2),
             ("System & Connect", "Configure providers and api preferences", "⚙️", 3)
         ]
@@ -10595,6 +10395,175 @@ class SettingsHubPage(QWidget):
         lay.addStretch(1)
         lay.addLayout(cards_lay)
         lay.addStretch(2)
+
+class _DaemonVoiceWorker(QObject):
+    """Run potentially long XTTS/FFmpeg work without blocking app shutdown."""
+
+    finished = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._worker_thread = None
+
+    def start(self):
+        if self.isRunning():
+            return
+        self._worker_thread = threading.Thread(
+            target=self._run_and_finish, daemon=True, name="jarvis-private-voice"
+        )
+        self._worker_thread.start()
+
+    def isRunning(self):
+        return self._worker_thread is not None and self._worker_thread.is_alive()
+
+    def _run_and_finish(self):
+        try:
+            self.run()
+        finally:
+            try:
+                self.finished.emit()
+            except RuntimeError:
+                pass  # Parent window may have been closed during model loading.
+
+
+class JarvisMicrophoneTestWorker(_DaemonVoiceWorker):
+    """Check microphone capture in the EXE without uploading/recording audio."""
+
+    completed = pyqtSignal(bool, str)
+
+    def run(self):
+        try:
+            import sounddevice as sd
+            import numpy as np
+            from core import audio_devices
+            from memory import config_manager
+
+            chosen = config_manager.get_input_device()
+            device = audio_devices.resolve(chosen, "input") if chosen else None
+            if device is None:
+                names = audio_devices.list_devices("input")
+                if not names:
+                    raise RuntimeError("No input microphone")
+                chosen = names[0]
+                device = audio_devices.resolve(chosen, "input")
+            if device is None:
+                raise RuntimeError("Invalid selected microphone")
+
+            peak = 0.0
+            with sd.InputStream(
+                samplerate=16000, channels=1, dtype="int16",
+                blocksize=1024, device=device,
+            ) as stream:
+                # About three seconds, bounded read in a background daemon.
+                for _ in range(47):
+                    samples, _overflow = stream.read(1024)
+                    if samples.size:
+                        peak = max(
+                            peak, float(np.max(np.abs(samples.astype(np.float32)))) / 32768.0
+                        )
+            if peak < 0.003:
+                result = (
+                    False,
+                    "A mikrofon megnyílik, de nem érzékelhető beszéd. "
+                    "Ellenőrizd a bemenetet és a Windows mikrofonengedélyeit."
+                )
+            else:
+                result = (
+                    True,
+                    "A mikrofon hangot érzékel. A Gemini Live API-kulcs "
+                    "és internetkapcsolat külön szükséges a beszélgetéshez."
+                )
+        except Exception as exc:
+            result = (
+                False,
+                "A kiválasztott mikrofon nem nyitható meg ("
+                + type(exc).__name__ + "). Ellenőrizd az eszközt és a Windows engedélyeit."
+            )
+        try:
+            self.completed.emit(*result)
+        except RuntimeError:
+            pass
+
+
+class HungarianVoiceSetupWorker(_DaemonVoiceWorker):
+    """User-confirmed public model preparation; never reads private reference."""
+
+    completed = pyqtSignal(bool, str)
+
+    def __init__(self, engine: str, parent=None):
+        super().__init__(parent)
+        self._engine = engine
+
+    def run(self):
+        try:
+            if self._engine == "f5":
+                from actions.f5_hungarian import download_model, _load_f5
+                ok = download_model(user_approved=True)
+                if ok:
+                    # Load the actual Hungarian checkpoint and public vocoder
+                    # in this daemon task, before claiming setup is complete.
+                    ok = _load_f5() is not None
+            else:
+                from actions.jarvis_voice import _load_model
+                ok = _load_model() is not None
+            result = (
+                bool(ok), "A magyar hangmodell helyben előkészítve."
+                if ok else "A helyi modell nem készült el."
+            )
+        except Exception:
+            result = (False, "A modell előkészítése sikertelen; ellenőrizd a telepítést és az internetkapcsolatot.")
+        try:
+            self.completed.emit(*result)
+        except RuntimeError:
+            pass
+
+
+class HungarianVoiceImportWorker(_DaemonVoiceWorker):
+    """Local FFmpeg conversion with no upload, safely detached on GUI exit."""
+
+    completed = pyqtSignal(bool, str)
+
+    def __init__(self, source: str, start_seconds: int, parent=None):
+        super().__init__(parent)
+        self._source = source
+        self._start_seconds = start_seconds
+
+    def run(self):
+        try:
+            from actions.voice_reference import prepare_reference
+            prepare_reference(self._source, start_seconds=self._start_seconds)
+            result = (True, "Helyi referencia sikeresen előkészítve (12 s PCM WAV).")
+        except Exception as exc:
+            from actions.voice_reference import ReferencePreparationError
+            if isinstance(exc, ReferencePreparationError):
+                result = (False, str(exc))
+            else:
+                result = (False, "A hangminta helyi előkészítése sikertelen.")
+        try:
+            self.completed.emit(*result)
+        except RuntimeError:
+            pass
+
+
+class HungarianVoiceTestWorker(_DaemonVoiceWorker):
+    """Asynchronous Hungarian speech without UI freezes or Qt thread crashes."""
+
+    completed = pyqtSignal(bool)
+
+    def run(self):
+        ok = False
+        try:
+            from actions.jarvis_voice import speak_authorized_hungarian
+            ok = speak_authorized_hungarian(
+                "Üdvözöllek! Itt JARVIS. A magyar hangrendszer tesztelése folyamatban."
+            )
+        except Exception:
+            pass
+        try:
+            self.completed.emit(ok)
+        except RuntimeError:
+            pass
+
 
 class SystemConnectivityPage(QWidget):
     def __init__(self, controller=None, parent=None):
@@ -10909,7 +10878,7 @@ class SystemConnectivityPage(QWidget):
 
 
         # Instagram Connect
-        ig_card = self._card("Instagram Connect", "Connect your personal Instagram account to allow Brahma Evo to manage your DMs.")
+        ig_card = self._card("Instagram Connect", "Connect your personal Instagram account to allow Jarvis AI to manage your DMs.")
         ig_lay = ig_card.layout()
 
         self._ig_status_lbl = QLabel("Status: Checking...")
@@ -11049,14 +11018,14 @@ class SystemConnectivityPage(QWidget):
         ast_row = QHBoxLayout()
         ast_row.addWidget(QLabel("Assistant Name"))
         self._set_ast_name = QLineEdit(identity.get_assistant_name())
-        self._set_ast_name.textChanged.connect(lambda t: identity.set_assistant_name(t.strip() or "Brahma"))
+        self._set_ast_name.textChanged.connect(lambda t: identity.set_assistant_name(t.strip() or "Jarvis AI"))
         ast_row.addWidget(self._set_ast_name)
         ilay.addLayout(ast_row)
         
         app_row = QHBoxLayout()
         app_row.addWidget(QLabel("Application Name"))
         self._set_app_name = QLineEdit(identity.get_application_name())
-        self._set_app_name.textChanged.connect(lambda t: identity.set_application_name(t.strip() or "Brahma Evo"))
+        self._set_app_name.textChanged.connect(lambda t: identity.set_application_name(t.strip() or "Jarvis AI"))
         app_row.addWidget(self._set_app_name)
         ilay.addLayout(app_row)
 
@@ -11091,33 +11060,23 @@ class SystemConnectivityPage(QWidget):
         card = self._card("AI Providers", "Only the supported providers are shown here.")
         lay1 = card.layout()
         self._api_defaults = self._load_api_defaults()
-        self._gemini_row, self._gemini_status, self._gemini_key = self._provider_row(
-            "Google Gemini",
-            self._api_defaults.get("gemini_api_key", ""),
-            "gemini-2.5-flash",
-            "gemini",
-        )
         self._or_row, self._or_status, self._or_key = self._provider_row(
             "OpenRouter",
             self._api_defaults.get("openrouter_api_key", ""),
             "auto",
             "openrouter",
         )
-        lay1.addWidget(self._gemini_row)
         lay1.addWidget(self._or_row)
         controls = QHBoxLayout()
         controls.setSpacing(12)
         self._default_provider = QComboBox()
-        self._default_provider.addItems(["Google Gemini", "OpenRouter", "Local"])
+        self._default_provider.addItems(["OpenRouter", "Local"])
         
-        current_provider = self._load_app_settings().get("default_ai_provider", "Gemini")
-        if current_provider in {"Gemini", "Google Gemini"}:
-            self._default_provider.setCurrentText("Google Gemini")
-        elif current_provider == "Local":
-            self._default_provider.setCurrentText("Local")
-        else:
-            self._default_provider.setCurrentText("OpenRouter")
-            
+        current_provider = self._load_app_settings().get("default_ai_provider", "OpenRouter")
+        self._default_provider.setCurrentText(
+            "Local" if current_provider == "Local" else "OpenRouter"
+        )
+
         self._default_provider.currentTextChanged.connect(self._set_default_provider)
         controls.addWidget(QLabel("Default AI Provider"))
         controls.addWidget(self._default_provider, 1)
@@ -11208,7 +11167,7 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(card)
 
         # Mobile connect
-        mobile = self._card("Mobile Connect", "Connect your phone and control Brahma Evo remotely.")
+        mobile = self._card("Mobile Connect", "Connect your phone and control Jarvis AI remotely.")
         ml = mobile.layout()
         self._mobile_status = QLabel("Connection Status: Ready")
         self._mobile_phone = QLabel("Phone Name: Not connected")
@@ -11247,9 +11206,9 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(attention)
 
         # Startup
-        startup = self._card("Startup", "Use Brahma Evo with Windows startup preferences.")
+        startup = self._card("Startup", "Use Jarvis AI with Windows startup preferences.")
         sl = startup.layout()
-        self._startup_launch_btn = self._mk_toggle("Launch Brahma Evo when Windows starts", bool(self._load_app_settings().get("show_workspace_on_startup", False)), self._toggle_startup_from_page)
+        self._startup_launch_btn = self._mk_toggle("Launch Jarvis AI when Windows starts", bool(self._load_app_settings().get("show_workspace_on_startup", False)), self._toggle_startup_from_page)
         self._startup_minimized_btn = self._mk_toggle("Launch Minimized", bool(self._load_app_settings().get("launch_minimized", False)), self._toggle_launch_minimized)
         self._startup_updates_btn = self._mk_toggle("Check for updates on startup", bool(self._load_app_settings().get("check_updates_on_startup", True)), self._toggle_update_check)
         sl.addWidget(self._startup_launch_btn)
@@ -11258,7 +11217,7 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(startup)
 
         # Shortcuts & Pinning
-        shortcuts = self._card("Shortcuts & Pinning", "Create shortcuts and pin Brahma Evo to your Windows system.")
+        shortcuts = self._card("Shortcuts & Pinning", "Create shortcuts and pin Jarvis AI to your Windows system.")
         shl = shortcuts.layout()
         
         btn_row = QHBoxLayout()
@@ -11275,7 +11234,7 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(shortcuts)
 
         # App Theme
-        theme_card = self._card("App Theme", "Select the primary color theme for Brahma Evo.")
+        theme_card = self._card("App Theme", "Select the primary color theme for Jarvis AI.")
         tl = theme_card.layout()
         theme_row = QHBoxLayout()
         theme_row.addWidget(QLabel("Primary Color:"))
@@ -11323,7 +11282,7 @@ class SystemConnectivityPage(QWidget):
         al.addWidget(self._preview_progress)
         lay.addWidget(anim)
         # Discord bot
-        discord = self._card("Discord Bot", "Mirror Brahma Evo between the app and your server.")
+        discord = self._card("Discord Bot", "Mirror Jarvis AI between the app and your server.")
         dl = discord.layout()
         self._discord_defaults = self._load_discord_settings()
         self._discord_status = QLabel("Bot Status: Offline")
@@ -11358,7 +11317,7 @@ class SystemConnectivityPage(QWidget):
         dl.addWidget(self._discord_msg)
         lay.addWidget(discord)
 
-        about = self._card("About Brahma Evo", "Brahma Evo information only.")
+        about = self._card("About Jarvis AI", "Jarvis AI information only.")
         ab = about.layout()
         about_grid = QGridLayout()
         about_grid.setHorizontalSpacing(22)
@@ -11414,7 +11373,7 @@ class SystemConnectivityPage(QWidget):
 
         rule_input_row = QHBoxLayout()
         self._ah_rule_input = QLineEdit()
-        self._ah_rule_input.setPlaceholderText("Teach Brahma a rule (e.g. Always summarize in bullet points)")
+        self._ah_rule_input.setPlaceholderText("Teach Jarvis AI a rule (e.g. Always summarize in bullet points)")
         rule_input_row.addWidget(self._ah_rule_input)
         self._ah_learn_btn = QPushButton("Teach Rule")
         self._ah_learn_btn.clicked.connect(self._handle_ah_learn_rule)
@@ -11432,7 +11391,7 @@ class SystemConnectivityPage(QWidget):
         except Exception:
             pass
 
-        # Brahma Audio Routing & Hardware Controls
+        # Jarvis AI Audio Routing & Hardware Controls
         audio_card = self._card("Audio Routing & Hardware Controls", "Select hardware audio interfaces, toggle Push-to-Talk, or inspect long-term memory.")
         alay = audio_card.layout()
 
@@ -11497,6 +11456,9 @@ class SystemConnectivityPage(QWidget):
             self._on_ptt_toggled
         )
         tools_row.addWidget(self._ptt_toggle)
+        self._mic_test_btn = QPushButton("Mikrofon próba (3 s)")
+        self._mic_test_btn.clicked.connect(self._start_jarvis_mic_test)
+        tools_row.addWidget(self._mic_test_btn)
 
         mem_btn = QPushButton("🧠 Inspect Memory")
         mem_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -11509,6 +11471,60 @@ class SystemConnectivityPage(QWidget):
         tools_row.addWidget(undo_btn)
         alay.addLayout(tools_row)
 
+        # Live JARVIS XTTS control — opt-in, user-local reference, no auto-download.
+        voice_card = self._card(
+            "JARVIS magyar hang (helyi XTTS-v2)",
+            "A hangminta csak a saját gépeden marad. Az XTTS csak külön engedéllyel "
+            "és érvényes helyi PCM WAV referencia esetén kapcsolható be."
+        )
+        vlay = voice_card.layout()
+        self._hu_voice_enabled_btn = self._mk_toggle(
+            "Magyar XTTS hang engedélyezése",
+            False,
+            self._on_hu_voice_toggled,
+        )
+        vlay.addWidget(self._hu_voice_enabled_btn)
+
+        from memory import config_manager
+        self._hu_voice_engine_picker = QComboBox()
+        self._hu_voice_engine_picker.addItem("F5-TTS Hungarian — egyedi magyar hang", "f5")
+        self._hu_voice_engine_picker.addItem("XTTS-v2 — korábbi magyar hangmotor", "xtts")
+        preferred = config_manager.get_setting("jarvis_voice_engine", "xtts")
+        self._hu_voice_engine_picker.setCurrentIndex(
+            max(0, self._hu_voice_engine_picker.findData(preferred))
+        )
+        self._hu_voice_engine_picker.currentIndexChanged.connect(
+            self._on_hu_voice_engine_changed
+        )
+        vlay.addWidget(self._hu_voice_engine_picker)
+
+        vlay.addWidget(QLabel("F5 referencia pontos magyar átirata (a kijelölt részlet szövege):"))
+        self._hu_voice_ref_text_edit = QLineEdit(
+            str(config_manager.get_setting("jarvis_f5_reference_text", "") or "")
+        )
+        self._hu_voice_ref_text_edit.setPlaceholderText(
+            "Írd vagy illeszd ide pontosan, ami az engedélyezett hangmintán elhangzik"
+        )
+        self._hu_voice_ref_text_edit.editingFinished.connect(
+            self._save_hu_reference_text
+        )
+        vlay.addWidget(self._hu_voice_ref_text_edit)
+        self._hu_voice_status_lbl = QLabel("")
+        self._hu_voice_status_lbl.setWordWrap(True)
+        self._hu_voice_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
+        vlay.addWidget(self._hu_voice_status_lbl)
+        self._hu_voice_setup_btn = QPushButton("Magyar hangmotor előkészítése (Windows)")
+        self._hu_voice_setup_btn.clicked.connect(self._launch_hu_voice_setup)
+        vlay.addWidget(self._hu_voice_setup_btn)
+        self._hu_voice_import_btn = QPushButton("Helyi MP3/WAV hangminta kiválasztása")
+        self._hu_voice_import_btn.clicked.connect(self._import_hu_voice_reference)
+        vlay.addWidget(self._hu_voice_import_btn)
+        self._hu_voice_test_btn = QPushButton("Magyar hang kipróbálása")
+        self._hu_voice_test_btn.clicked.connect(self._test_hu_voice)
+        vlay.addWidget(self._hu_voice_test_btn)
+        alay.addWidget(voice_card)
+        self._refresh_hu_voice_controls()
+
         self._audio_status_lbl = QLabel("Hardware audio deduplication, echo guard and undo stack active.")
         self._audio_status_lbl.setStyleSheet(f"color: {C.TEXT_MED}; font-size: 11px;")
         alay.addWidget(self._audio_status_lbl)
@@ -11518,6 +11534,234 @@ class SystemConnectivityPage(QWidget):
         lay.addStretch(1)
         return col
 
+
+    def _on_hu_voice_engine_changed(self, _index: int):
+        from memory import config_manager
+        engine = self._hu_voice_engine_picker.currentData()
+        if engine not in ("f5", "xtts"):
+            return
+        try:
+            config_manager.set_setting("jarvis_voice_engine", engine)
+            if config_manager.get_setting("jarvis_voice_engine") != engine:
+                raise OSError("Engine preference not saved")
+            config_manager.set_setting("jarvis_voice_enabled", False)
+        except Exception:
+            QMessageBox.warning(self, "Magyar hang", "A hangmotor beállítása nem menthető.")
+        self._refresh_hu_voice_controls()
+
+    def _save_hu_reference_text(self):
+        from memory import config_manager
+        text = self._hu_voice_ref_text_edit.text().strip()
+        try:
+            config_manager.set_setting("jarvis_f5_reference_text", text)
+            if config_manager.get_setting("jarvis_f5_reference_text") != text:
+                raise OSError("Reference transcript not saved")
+        except Exception:
+            QMessageBox.warning(self, "Magyar hang", "A referencia szövegét nem sikerült elmenteni.")
+        self._refresh_hu_voice_controls()
+
+    def _on_hu_voice_setup_completed(self, ok: bool, message: str):
+        self._hu_voice_setup_worker = None
+        self._refresh_hu_voice_controls()
+        self._hu_voice_status_lbl.setText(message)
+
+    def _refresh_hu_voice_controls(self):
+        from actions.jarvis_voice import voice_readiness
+        status = voice_readiness()
+        self._hu_voice_enabled_btn.blockSignals(True)
+        try:
+            self._hu_voice_enabled_btn.setChecked(bool(status["enabled"]))
+        finally:
+            self._hu_voice_enabled_btn.blockSignals(False)
+        import_running = bool(
+            getattr(self, "_hu_voice_import_worker", None)
+            and self._hu_voice_import_worker.isRunning()
+        )
+        self._hu_voice_status_lbl.setText(str(status["reason"]))
+        self._hu_voice_ref_text_edit.setEnabled(status["engine"] == "f5" and not import_running)
+        setup_running = bool(
+            getattr(self, "_hu_voice_setup_worker", None)
+            and self._hu_voice_setup_worker.isRunning()
+        )
+        self._hu_voice_setup_btn.setEnabled(not setup_running and not import_running)
+        self._hu_voice_engine_picker.setEnabled(not setup_running and not import_running)
+        self._hu_voice_setup_btn.setText(
+            "F5 magyar modell előkészítése (helyi)" if status["engine"] == "f5"
+            else "XTTS-v2 modell előkészítése (helyi)"
+        )
+        self._hu_voice_enabled_btn.setEnabled(not import_running and not setup_running)
+        self._hu_voice_import_btn.setEnabled(not import_running)
+        self._hu_voice_test_btn.setEnabled(
+            bool(status["enabled"] and status["can_enable"])
+            and not import_running
+            and not (getattr(self, "_hu_voice_worker", None)
+                     and self._hu_voice_worker.isRunning())
+        )
+
+    def _launch_hu_voice_setup(self):
+        """Prepare the selected model from inside the installed desktop EXE."""
+        if platform.system() != "Windows":
+            QMessageBox.information(self, "Magyar hang", "A telepített hangmotor Windows alatt támogatott.")
+            return
+        if getattr(self, "_hu_voice_setup_worker", None) and self._hu_voice_setup_worker.isRunning():
+            return
+        engine = self._hu_voice_engine_picker.currentData()
+        if engine == "f5":
+            details = (
+                "A magyar F5-TTS nyilvános modellje (~672 MB) a saját gépedre töltődik le. "
+                "A modell licence CC-BY-NC-4.0: nem kereskedelmi felhasználásra. "
+                "A privát hangmintát nem tölti fel és nem olvassa be ez a lépés. "
+                "Elfogadod a modell licencfeltételeit és elindítod a letöltést?"
+            )
+        else:
+            details = (
+                "Az XTTS-v2 modell letöltése és helyi előkészítése indulhat; "
+                "a modell licencfeltételeit neked kell elfogadnod. "
+                "A privát hangminta nem kerül feltöltésre. Folytatod?"
+            )
+        approved = QMessageBox.question(
+            self, "Magyar hangmodell előkészítése", details,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if approved != QMessageBox.StandardButton.Yes:
+            return
+        worker = HungarianVoiceSetupWorker(engine, self)
+        self._hu_voice_setup_worker = worker
+        worker.completed.connect(self._on_hu_voice_setup_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+        self._refresh_hu_voice_controls()
+        self._hu_voice_status_lbl.setText("A magyar modell előkészítése folyamatban…")
+
+    def _import_hu_voice_reference(self):
+        """Explicit local-only import; the selected voice must be authorized."""
+        if getattr(self, "_hu_voice_import_worker", None) and self._hu_voice_import_worker.isRunning():
+            return
+        source, _ = QFileDialog.getOpenFileName(
+            self, "Engedélyezett helyi hangminta kiválasztása", "",
+            "Audio fájl (*.mp3 *.wav)"
+        )
+        if not source:
+            return
+        start, ok = QInputDialog.getInt(
+            self, "Referencia-részlet kiválasztása",
+            "Hányadik másodperctől kezdődjön a 12 másodperces részlet? "
+            "(Válassz egyetlen beszélőt tartalmazó, tiszta szakaszt.)",
+            0, 0, 3600, 1
+        )
+        if not ok:
+            return
+        approved = QMessageBox.question(
+            self, "Privát magyar hangreferencia",
+            "Igazolod, hogy rendelkezel a kiválasztott hang megfelelő "
+            "AI beszédszintézisre szóló felhasználási engedélyével?\n\n"
+            "A kiválasztott részlet kizárólag helyben, FFmpeg segítségével "
+            "alakul PCM WAV-fájllá a saját felhasználói könyvtárban. "
+            "A korábbi helyi referencia felülíródik. Nem történik feltöltés.\n\n"
+            "Folytatod?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if approved != QMessageBox.StandardButton.Yes:
+            return
+        self._hu_voice_status_lbl.setText("Helyi referencia előkészítése folyamatban…")
+        worker = HungarianVoiceImportWorker(source, start, self)
+        self._hu_voice_import_worker = worker
+        worker.completed.connect(self._on_hu_voice_import_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+        self._refresh_hu_voice_controls()
+        self._hu_voice_status_lbl.setText("A hangminta helyi feldolgozása folyamatban…")
+
+    def _on_hu_voice_import_completed(self, ok: bool, message: str):
+        self._hu_voice_import_worker = None
+        self._refresh_hu_voice_controls()
+        if not ok:
+            self._hu_voice_status_lbl.setText(message)
+        elif os.environ.get("JARVIS_VOICE_REFERENCE", "").strip():
+            self._hu_voice_status_lbl.setText(
+                "A WAV elkészült, de a JARVIS_VOICE_REFERENCE környezeti "
+                "változó felülírja az alapértelmezett referencia kiválasztását."
+            )
+        else:
+            self._hu_voice_status_lbl.setText(message)
+
+    def _on_hu_voice_toggled(self, enabled: bool):
+        from actions.jarvis_voice import voice_readiness
+        from memory import config_manager
+        if enabled:
+            status = voice_readiness()
+            if not status["can_enable"]:
+                QMessageBox.warning(self, "Magyar XTTS nem használható",
+                                    str(status["reason"]) + "\n\n"
+                                    "A helyi referencia és a függőségek előkészítése szükséges.")
+                self._refresh_hu_voice_controls()
+                return
+            result = QMessageBox.question(
+                self, "Magyar hang engedélyezése",
+                "Megerősíted, hogy jogosult vagy a helyi referenciahang "
+                "AI beszédszintézisre történő használatára?\n\n"
+                "Az XTTS első hangpróbája a modell letöltésével és a modelllicenc "
+                "elfogadásával járhat. A referenciahang nem kerül felhőbe.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                self._refresh_hu_voice_controls()
+                return
+        try:
+            config_manager.set_setting("jarvis_voice_enabled", bool(enabled))
+            # config_manager currently catches disk errors internally; verify persistence.
+            if config_manager.get_setting("jarvis_voice_enabled") is not bool(enabled):
+                raise OSError("Voice setting was not persisted")
+            if not enabled:
+                from actions.jarvis_voice import stop_authorized_hungarian
+                stop_authorized_hungarian()
+        except Exception:
+            QMessageBox.warning(self, "Beállítási hiba",
+                                "A hangbeállítást nem sikerült elmenteni.")
+        self._refresh_hu_voice_controls()
+
+    def _test_hu_voice(self):
+        from actions.jarvis_voice import is_configured, voice_readiness
+        if not is_configured() or not voice_readiness()["can_enable"]:
+            self._refresh_hu_voice_controls()
+            return
+        if getattr(self, "_hu_voice_worker", None) and self._hu_voice_worker.isRunning():
+            return
+        self._hu_voice_status_lbl.setText("Magyar hangpróba folyamatban…")
+        self._hu_voice_test_btn.setEnabled(False)
+        worker = HungarianVoiceTestWorker(self)
+        self._hu_voice_worker = worker
+        worker.completed.connect(self._on_hu_voice_test_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def _on_hu_voice_test_completed(self, ok: bool):
+        self._hu_voice_worker = None
+        self._refresh_hu_voice_controls()
+        if not ok:
+            self._hu_voice_status_lbl.setText(
+                "Hangpróba sikertelen. Ellenőrizd az XTTS telepítését és "
+                "a modell licencelfogadását. A rendszer többi hangja megmarad."
+            )
+
+    def _start_jarvis_mic_test(self):
+        if getattr(self, "_jarvis_mic_test_worker", None) and self._jarvis_mic_test_worker.isRunning():
+            return
+        worker = JarvisMicrophoneTestWorker(self)
+        self._jarvis_mic_test_worker = worker
+        self._mic_test_btn.setEnabled(False)
+        self._audio_status_lbl.setText("Mikrofon mérése 3 másodpercig — beszélj a kiválasztott bemenetbe.")
+        worker.completed.connect(self._on_jarvis_mic_test_completed)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def _on_jarvis_mic_test_completed(self, ok: bool, message: str):
+        self._jarvis_mic_test_worker = None
+        self._mic_test_btn.setEnabled(True)
+        self._audio_status_lbl.setText(("✅ " if ok else "⚠️ ") + message)
 
     def _on_input_device_changed(self, name: str):
         try:
@@ -12129,7 +12373,7 @@ class SystemConnectivityPage(QWidget):
             "Steps to complete:\n"
             "1. Log in to Spotify in the browser window.\n"
             "2. Click 'Agree' to grant playback permissions.\n"
-            "3. Once redirected to callback, Brahma Evo will automatically detect authorization!"
+            "3. Once redirected to callback, Jarvis AI will automatically detect authorization!"
         )
 
     def _poll_spotify_auth_status(self):
@@ -12330,11 +12574,11 @@ class SystemConnectivityPage(QWidget):
             AutoHealEngine.record_last_error(tb)
             self._ah_output_lbl.setText(
                 f"❌ Simulated bug triggered in test_action.py: {type(e).__name__}: {e}\n"
-                f"Traceback captured in AutoHealEngine! Click 'Fix Captured Bug' or say 'Brahma, fix that bug'."
+                f"Traceback captured in AutoHealEngine! Click 'Fix Captured Bug' or say 'Jarvis AI, fix that bug'."
             )
 
     def _handle_ah_fix_captured_bug(self):
-        self._ah_output_lbl.setText("⏳ Gemini is synthesizing hotfix in safety sandbox...")
+        self._ah_output_lbl.setText("⏳ OpenRouter is synthesizing hotfix in safety sandbox...")
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
         try:
@@ -12393,7 +12637,7 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(self._sys_note)
         self._sys_version = QLabel("v1.0.0")
         self._sys_platform = QLabel(platform.system())
-        self._sys_provider = QLabel("Gemini")
+        self._sys_provider = QLabel("OpenRouter")
         self._sys_updated = QLabel(time.strftime("%d %b %Y %H:%M"))
         for label, val in (("Version", self._sys_version), ("Platform", self._sys_platform), ("Current AI Provider", self._sys_provider), ("Last Updated", self._sys_updated)):
             row = QHBoxLayout()
@@ -12407,7 +12651,7 @@ class SystemConnectivityPage(QWidget):
         box = self._card("Quick Actions", "")
         lay = box.layout()
         actions = [
-            ("Restart Brahma Evo", QStyle.StandardPixmap.SP_BrowserReload, self._restart_app),
+            ("Restart Jarvis AI", QStyle.StandardPixmap.SP_BrowserReload, self._restart_app),
             ("Reload Configuration", QStyle.StandardPixmap.SP_BrowserReload, self._reload_config),
             ("Open Data Folder", QStyle.StandardPixmap.SP_DirOpenIcon, self._open_data_folder),
             ("View Logs", QStyle.StandardPixmap.SP_FileDialogDetailedView, self._view_logs),
@@ -12440,7 +12684,6 @@ class SystemConnectivityPage(QWidget):
         if self._ctrl() and hasattr(self._ctrl(), "_win"):
             return self._ctrl()._win._load_api_defaults()
         return {
-            "gemini_api_key": "",
             "openrouter_api_key": "",
             "os_system": platform.system(),
         }
@@ -12494,10 +12737,9 @@ class SystemConnectivityPage(QWidget):
             self._ctrl()._win._show_setup(self._ctrl()._win._load_api_defaults())
 
     def _test_provider(self, setting_key: str):
-        if setting_key == "gemini":
-            msg = "Google Gemini key detected." if self._load_api_defaults().get("gemini_api_key") else "Google Gemini key missing."
-        else:
-            msg = "OpenRouter key detected." if self._load_api_defaults().get("openrouter_api_key") else "OpenRouter key missing."
+        msg = "OpenRouter key detected." if self._load_api_defaults().get(
+            "openrouter_api_key"
+        ) else "OpenRouter key missing."
         if self._ctrl() and hasattr(self._ctrl(), "write_log"):
             self._ctrl().write_log(f"SYS: {msg}")
         self.refresh()
@@ -12552,42 +12794,20 @@ class SystemConnectivityPage(QWidget):
             self._ctrl()._win._refresh_startup_animation_button()
 
     def _set_default_provider(self, text: str):
-        raw = (text or "").strip().lower()
-        if raw.startswith("google") or raw == "gemini":
-            provider = "Gemini"
-            self._set_setting("offline_mode_enabled", False)
-            if hasattr(self, "_offline_mode_btn"):
-                self._offline_mode_btn.blockSignals(True)
-                self._offline_mode_btn.setChecked(False)
-                self._offline_mode_btn.blockSignals(False)
-            if hasattr(self, "_local_ai_widget"):
-                self._local_ai_widget.setVisible(False)
-            msg = "SYS: Default AI provider set to Google Gemini. Cloud connectivity active."
-        elif raw == "local":
-            provider = "Local"
-            self._set_setting("offline_mode_enabled", True)
-            if hasattr(self, "_offline_mode_btn"):
-                self._offline_mode_btn.blockSignals(True)
-                self._offline_mode_btn.setChecked(True)
-                self._offline_mode_btn.blockSignals(False)
-            if hasattr(self, "_local_ai_widget"):
-                self._local_ai_widget.setVisible(True)
-            msg = "SYS: Default AI provider set to Local AI (Ollama). Offline Mode active."
-        else:
-            provider = "OpenRouter"
-            self._set_setting("offline_mode_enabled", False)
-            if hasattr(self, "_offline_mode_btn"):
-                self._offline_mode_btn.blockSignals(True)
-                self._offline_mode_btn.setChecked(False)
-                self._offline_mode_btn.blockSignals(False)
-            if hasattr(self, "_local_ai_widget"):
-                self._local_ai_widget.setVisible(False)
-            msg = "SYS: Default AI provider set to OpenRouter. Cloud connectivity active."
+        provider = "Local" if (text or "").strip().lower() == "local" else "OpenRouter"
+        is_local = provider == "Local"
+        self._set_setting("offline_mode_enabled", is_local)
+        if hasattr(self, "_offline_mode_btn"):
+            self._offline_mode_btn.blockSignals(True)
+            self._offline_mode_btn.setChecked(is_local)
+            self._offline_mode_btn.blockSignals(False)
+        if hasattr(self, "_local_ai_widget"):
+            self._local_ai_widget.setVisible(is_local)
         self._set_setting("default_ai_provider", provider)
         if hasattr(self, "_sys_provider"):
             self._sys_provider.setText(provider)
         if self._ctrl() and hasattr(self._ctrl(), "write_log"):
-            self._ctrl().write_log(msg)
+            self._ctrl().write_log(f"SYS: AI provider set to {provider}.")
 
     def _toggle_auto_provider_switch(self, checked: bool):
         self._set_setting("auto_provider_switch", bool(checked))
@@ -12608,15 +12828,15 @@ class SystemConnectivityPage(QWidget):
                 self._sys_provider.setText("Local")
             msg = "🔒 SYSTEM: Air-Gapped Offline Mode ENGAGED. All operations running 100% locally."
         else:
-            self._set_setting("default_ai_provider", "Gemini")
+            self._set_setting("default_ai_provider", "OpenRouter")
             if hasattr(self, "_default_provider"):
                 self._default_provider.blockSignals(True)
-                self._default_provider.setCurrentText("Google Gemini")
+                self._default_provider.setCurrentText("OpenRouter")
                 self._default_provider.blockSignals(False)
             if hasattr(self, "_local_ai_widget"):
                 self._local_ai_widget.setVisible(False)
             if hasattr(self, "_sys_provider"):
-                self._sys_provider.setText("Gemini")
+                self._sys_provider.setText("OpenRouter")
             msg = "🌐 SYSTEM: Offline Mode DISENGAGED. Cloud connectivity restored."
         if self._ctrl() and hasattr(self._ctrl(), "write_log"):
             self._ctrl().write_log(msg)
@@ -12667,7 +12887,7 @@ class SystemConnectivityPage(QWidget):
             self._ctrl()._win._start_discord_bot()
             self._ctrl()._win._stop_discord_bot()
             self._discord_status.setText("Bot Status: Test sent")
-            self._discord_msg.setText("Connected as Brahma Evo#9649" if self._discord_token.text().strip() else "Bot Offline")
+            self._discord_msg.setText("Connected as Jarvis AI#9649" if self._discord_token.text().strip() else "Bot Offline")
 
     def _restart_discord_from_page(self):
         if self._ctrl() and hasattr(self._ctrl(), "_win"):
@@ -12704,6 +12924,8 @@ class SystemConnectivityPage(QWidget):
             self._ctrl().write_log("SYS: Update check requested.")
 
     def refresh(self):
+        if hasattr(self, "_hu_voice_enabled_btn"):
+            self._refresh_hu_voice_controls()
         api = self._load_api_defaults()
         app = self._load_app_settings()
         discord = self._load_discord_settings()
@@ -12724,19 +12946,17 @@ class SystemConnectivityPage(QWidget):
             if widget is not None:
                 widget.blockSignals(True)
         try:
-            self._gemini_status.setText("Connected" if api.get("gemini_api_key") else "Not connected")
-            self._or_status.setText("Connected" if api.get("openrouter_api_key") else "Not connected")
-            self._gemini_key.setText(self._provider_key_preview(api.get("gemini_api_key", "")))
+            self._or_status.setText("Configured" if api.get("openrouter_api_key") else "Not configured")
             self._or_key.setText(self._provider_key_preview(api.get("openrouter_api_key", "")))
             
-            prov = app.get("default_ai_provider", "Gemini")
+            prov = app.get("default_ai_provider", "OpenRouter")
             is_offline = bool(app.get("offline_mode_enabled", False))
             if prov == "Local" or is_offline:
                 disp_prov = "Local"
             elif prov == "OpenRouter":
                 disp_prov = "OpenRouter"
             else:
-                disp_prov = "Google Gemini"
+                disp_prov = "OpenRouter"
             if hasattr(self, "_default_provider"):
                 self._default_provider.setCurrentText(disp_prov)
             if hasattr(self, "_offline_mode_btn"):
@@ -12774,7 +12994,7 @@ class SystemConnectivityPage(QWidget):
         token = (discord.get("bot_token") or "").strip()
         if enabled and token:
             self._discord_status.setText("Bot Status: Online")
-            self._discord_msg.setText("Connected as Brahma Evo#9649")
+            self._discord_msg.setText("Connected as Jarvis AI#9649")
         elif token:
             self._discord_status.setText("Bot Status: Offline")
             self._discord_msg.setText("Bot Offline")
@@ -12782,7 +13002,7 @@ class SystemConnectivityPage(QWidget):
             self._discord_status.setText("Bot Status: Offline")
             self._discord_msg.setText("Token required")
         if hasattr(self, "_sys_provider"):
-            self._sys_provider.setText(app.get("default_ai_provider", "Gemini"))
+            self._sys_provider.setText(app.get("default_ai_provider", "OpenRouter"))
         if hasattr(self, "_update_spotify_status"):
             self._update_spotify_status()
 
@@ -12831,7 +13051,7 @@ class SystemConnectivityPage(QWidget):
                 desktop_dir = Path(os.path.expanduser("~")) / "Desktop"
                 
             desktop_dir.mkdir(parents=True, exist_ok=True)
-            shortcut_path = desktop_dir / "Brahma Evo - Premium.lnk"
+            shortcut_path = desktop_dir / "Jarvis AI - Premium.lnk"
             
             # Base variables
             base_dir = Path(os.path.abspath("."))
@@ -12861,7 +13081,7 @@ class SystemConnectivityPage(QWidget):
                 f"$Shortcut.Arguments = '{_ps_escape(shortcut_args)}'",
                 f"$Shortcut.WorkingDirectory = '{_ps_escape(str(base_dir))}'",
                 "$Shortcut.WindowStyle = 7",
-                "$Shortcut.Description = 'Launch Brahma Evo - Premium'",
+                "$Shortcut.Description = 'Launch Jarvis AI - Premium'",
                 f"if ('{_ps_escape(icon_value)}') {{ $Shortcut.IconLocation = '{_ps_escape(icon_value)},0' }}",
                 "$Shortcut.Save()",
             ])
@@ -12921,9 +13141,9 @@ class SystemConnectivityPage(QWidget):
             )
             
             if res.returncode == 0:
-                return True, "Brahma Evo has been pinned to your Taskbar!"
+                return True, "Jarvis AI has been pinned to your Taskbar!"
             else:
-                return False, "Windows restricts programmatic taskbar pinning. Please right-click the 'Brahma Evo - Premium.lnk' shortcut on your Desktop and select 'Pin to taskbar', or drag it directly onto your taskbar."
+                return False, "Windows restricts programmatic taskbar pinning. Please right-click the 'Jarvis AI - Premium.lnk' shortcut on your Desktop and select 'Pin to taskbar', or drag it directly onto your taskbar."
         except Exception as e:
             return False, f"Error pinning to taskbar: {e}"
 
@@ -13025,7 +13245,7 @@ class SmartDevicesSection(QFrame):
         empty_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_desc.setFont(QFont("Segoe UI", 8))
         empty_desc.setStyleSheet(f"color: {C.TEXT_DIM};")
-        empty_btn = QPushButton("Open Brahma Evo Home")
+        empty_btn = QPushButton("Open Jarvis AI Home")
         empty_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         empty_btn.setFixedWidth(160)
         empty_btn.setStyleSheet(f"""
@@ -13613,7 +13833,7 @@ class BrahmaConnectDevicesPage(QFrame):
         self._title = QLabel("DEVICES")
         self._title.setFont(QFont("Segoe UI", 18, QFont.Weight.Black))
         self._title.setStyleSheet("color: #ffffff; letter-spacing: 2px;")
-        self._subtitle = QLabel("Everything connected to Brahma.")
+        self._subtitle = QLabel("Everything connected to Jarvis AI.")
         self._subtitle.setFont(QFont("Segoe UI", 9))
         self._subtitle.setStyleSheet("color: rgba(255,255,255,0.62);")
         title_box.addWidget(self._title)
@@ -13994,7 +14214,7 @@ class BrahmaConnectDevicesPage(QFrame):
             import io
             import qrcode
 
-            self._onboarding_offer = dict(service.create_pairing_offer(device_name="Brahma Connect", platform="gateway"))
+            self._onboarding_offer = dict(service.create_pairing_offer(device_name="Jarvis AI Connect", platform="gateway"))
             code = str(self._onboarding_offer.get("pairing_code") or "------")
             self._onb_code_lbl.setText(code)
             self._onb_status_lbl.setText("WAITING FOR CONNECTION")
@@ -14229,7 +14449,7 @@ class BrahmaUI:
         self._app = QApplication.instance() or QApplication(sys.argv)
         self._app.setStyle("Fusion")
         self._app.setQuitOnLastWindowClosed(False)
-        self._app.setApplicationDisplayName("Brahma Evo")
+        self._app.setApplicationDisplayName("Jarvis AI")
         self._app.setWindowIcon(self._make_app_icon())
         try:
             current_store = workspace_store()
@@ -14286,7 +14506,7 @@ class BrahmaUI:
         except Exception:
             pass
         self._tray = QSystemTrayIcon(self._make_app_icon(), self._app)
-        self._tray.setToolTip("Brahma Evo")
+        self._tray.setToolTip("Jarvis AI")
         self._tray.activated.connect(self._on_tray_activated)
         self._tray.setContextMenu(self._build_tray_menu())
         self._tray.show()
@@ -15021,7 +15241,7 @@ class BrahmaUI:
             self._win._hud_deliverable_sig.emit(payload)
 
     def show_content(self, title: str, body: str):
-        """Universal rich content presenter. Automatically routes to the Brahma Holographic Left Deliverable Wing."""
+        """Universal rich content presenter. Automatically routes to the Jarvis AI Holographic Left Deliverable Wing."""
         import re
         file_path = None
         m = re.search(r'([A-Za-z]:\\[^\s"\'<>`\r\n]+\.(?:pdf|docx|xlsx|pptx|png|jpg|mp4|py|html|json|txt))', body)
