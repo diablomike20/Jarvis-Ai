@@ -41,6 +41,9 @@ jobs:
       - name: Verify new JARVIS permission broker
         shell: pwsh
         run: python -m unittest discover -s tests -p test_claude_permission_broker.py -v
+      - name: Verify merged JARVIS delivery/Claude integration contents
+        shell: pwsh
+        run: python -m unittest discover -s tests -p test_nextgen_merge_integrity.py -v
       - name: Install Brahma Python dependencies and PyInstaller
         shell: pwsh
         run: |
