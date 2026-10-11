@@ -11,6 +11,7 @@ import io
 import json
 import os
 import sys
+from urllib.request import Request, urlopen
 from typing import Any
 
 SERVER_NAME = "brahma-windows"
@@ -104,6 +105,33 @@ def _int(value: Any, label: str, minimum: int = -100000, maximum: int = 100000) 
     if type(value) is not int or not minimum <= value <= maximum:
         raise ValueError(f"Invalid integer parameter {label}")
     return value
+
+
+def _executor_permission(name: str, args: dict) -> bool:
+    """A tool is never executed based only on its self-declared MCP parameters.
+
+    This one-time grant is issued by the JARVIS UI after Claude's structured
+    can_use_tool request; standalone/misconfigured MCP processes fail closed.
+    """
+    port = os.environ.get("BRAHMA_MCP_BROKER_PORT", "")
+    token = os.environ.get("BRAHMA_MCP_BROKER_TOKEN", "")
+    if not token or not port.isascii() or not port.isdecimal() or not 1 <= int(port) <= 65535:
+        return False
+    try:
+        payload = json.dumps({"name": name, "arguments": args}, ensure_ascii=False).encode("utf-8")
+        if len(payload) > 65536:
+            return False
+        req = Request(
+            f"http://127.0.0.1:{port}/authorize",
+            data=payload,
+            headers={"X-Brahma-Token": token, "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(req, timeout=3.0) as response:
+            result = json.loads(response.read(1024))
+        return result.get("allow") is True
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
 
 
 def _desktop_tool(name: str, args: dict) -> dict:
@@ -221,6 +249,8 @@ def dispatch(message: dict) -> dict | None:
         if name not in {tool["name"] for tool in TOOLS} or not isinstance(args, dict):
             return _text("Unknown tool or invalid arguments.", True)
         try:
+            if not _executor_permission(name, args):
+                return _text("JARVIS authorization required or expired for desktop tool.", True)
             return _desktop_tool(name, args)
         except Exception as exc:
             # No stack traces or potentially private inputs in protocol output.
