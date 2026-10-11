@@ -43,6 +43,7 @@ API_URL               = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MAX_TOKENS    = 4096
 DEFAULT_TEMPERATURE   = 0.7
 REQUEST_TIMEOUT       = 18   # bounded wait for responsive free-model fallback
+MAX_FALLBACK_MODELS    = 4    # Free-model failover attempts per request (bounded)
 MAX_RETRIES_PER_MODEL = 1    # attempts before moving to next model
 RETRY_DELAY           = 2    # seconds between retries
 RATE_LIMIT_COOLDOWN   = 60   # seconds before retrying a rate-limited model
