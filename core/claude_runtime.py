@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any, Callable, Iterator, Optional
 
 from core.user_paths import get_user_data_dir
@@ -97,18 +98,46 @@ def resolve_node() -> str:
 
 
 def provider_env(settings: dict, model: Optional[str] = None) -> dict[str, str]:
-    key = _openrouter_key()
-    if not key:
-        raise ClaudeRuntimeError("Hiányzik az OpenRouter API-kulcs (openrouter_api_key vagy OPENROUTER_API_KEY).")
+    """Create an explicitly free OpenRouter or loopback-local model transport.
+
+    This layer never silently chooses billable OpenRouter models. Local backends
+    must implement Anthropic Messages and compatible tool-use semantics.
+    """
     chosen = str(model or settings.get("claude_code_model") or "openrouter/free").strip()
     if not chosen:
         raise ClaudeRuntimeError("Üres Claude Code modellazonosító.")
+    local_url = str(settings.get("claude_code_local_anthropic_url") or "").strip()
     env = dict(os.environ)
+    if local_url:
+        parsed = urlparse(local_url)
+        if (parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost", "::1")
+                or parsed.username or parsed.password or parsed.path not in ("", "/")
+                or parsed.query or parsed.fragment):
+            raise ClaudeRuntimeError("A helyi Claude endpoint kizárólag HTTP loopback címen engedélyezett.")
+        try:
+            if not parsed.port:
+                raise ValueError("local port missing")
+        except ValueError:
+            raise ClaudeRuntimeError("Érvénytelen helyi Anthropic-kompatibilis endpoint port.")
+        if chosen == "openrouter/free":
+            raise ClaudeRuntimeError("Helyi módhoz add meg a claude_code_model helyi modellazonosítóját.")
+        base_url, token = local_url.rstrip("/"), "jarvis-local"
+        env.pop("OPENROUTER_API_KEY", None)  # Never forward cloud credentials locally.
+    else:
+        if chosen != "openrouter/free" and not chosen.endswith(":free"):
+            raise ClaudeRuntimeError(
+                "A JARVIS jelenlegi kizárólag ingyenes módjában fizetős OpenRouter modell nem engedélyezett."
+            )
+        token = _openrouter_key()
+        if not token:
+            raise ClaudeRuntimeError("Hiányzik az OpenRouter API-kulcs (openrouter_api_key vagy OPENROUTER_API_KEY).")
+        base_url = OPENROUTER_URL
+        env["OPENROUTER_API_KEY"] = token
+
     env.update({
-        "ANTHROPIC_BASE_URL": OPENROUTER_URL,
-        "ANTHROPIC_AUTH_TOKEN": key,
+        "ANTHROPIC_BASE_URL": base_url,
+        "ANTHROPIC_AUTH_TOKEN": token,
         "ANTHROPIC_API_KEY": "",
-        "OPENROUTER_API_KEY": key,
         "ANTHROPIC_MODEL": chosen,
         "ANTHROPIC_DEFAULT_SONNET_MODEL": chosen,
         "ANTHROPIC_DEFAULT_OPUS_MODEL": chosen,
@@ -119,8 +148,6 @@ def provider_env(settings: dict, model: Optional[str] = None) -> dict[str, str]:
         "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
         "PYTHONIOENCODING": "utf-8",
     })
-    # The subprocess may execute MCP child processes from a user's workspace:
-    # let Python resolve Brahma's core package when running from sources.
     root = str(Path(__file__).resolve().parent.parent)
     env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
     overrides = settings.get("claude_code_feature_overrides")
@@ -381,6 +408,9 @@ def probe_claude_runtime() -> dict:
         cli = resolve_cli(settings)
         node = resolve_node()
         key_present = bool(_openrouter_key())
+        local_mode = bool(settings.get("claude_code_local_anthropic_url"))
+        if local_mode:
+            provider_env(settings)  # Validate the loopback URL and configured local model.
         manifest = _read_json(cli.parent / "claude-feature-manifest.json")
         native_mcp_ready = True
         if settings.get("claude_code_windows_mcp", True) and os.name == "nt":
@@ -389,15 +419,17 @@ def probe_claude_runtime() -> dict:
             except ClaudeRuntimeError:
                 native_mcp_ready = False
         return {
-            "ready": key_present and native_mcp_ready,
+            "ready": (key_present or local_mode) and native_mcp_ready,
+            "ready_scope": "engine_files_and_provider_configuration_only",
             "cli": str(cli), "node": node,
             "windows_native_mcp_ready": native_mcp_ready,
             "openrouter_key_configured": key_present,
+            "local_model_configured": local_mode,
             "compiled_feature_count": len(manifest.get("enabledCompileGates") or []),
             "compile_status": manifest.get("buildStatus", "unknown"),
             "native_package_audit": manifest.get("reconstructedNativePackages", {}),
             "model": settings.get("claude_code_model", "openrouter/free"),
-            "provider": "OpenRouter",
+            "provider": "local-loopback" if local_mode else "OpenRouter",
             "note": "Build availability only; native features and model compatibility require tests.",
         }
     except ClaudeRuntimeError as exc:

@@ -54,6 +54,33 @@ class TestClaudeRuntime(unittest.TestCase):
         self.assertEqual(env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"], "1")
         self.assertEqual(env["ANTHROPIC_DEFAULT_OPUS_MODEL"], "openrouter/free")
 
+    def test_paid_model_is_rejected_before_any_api_call(self):
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test"}):
+            with self.assertRaisesRegex(ClaudeRuntimeError, "fizetős"):
+                provider_env({"claude_code_model": "anthropic/claude-sonnet-4"})
+
+    def test_free_model_is_allowed(self):
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test"}):
+            env = provider_env({"claude_code_model": "example/model:free"})
+        self.assertEqual(env["ANTHROPIC_MODEL"], "example/model:free")
+
+    def test_local_loopback_provider_does_not_require_cloud_key(self):
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}):
+            env = provider_env({"claude_code_local_anthropic_url": "http://127.0.0.1:8080",
+                                "claude_code_model": "my-local-tool-model"})
+        self.assertEqual(env["ANTHROPIC_BASE_URL"], "http://127.0.0.1:8080")
+        self.assertEqual(env["ANTHROPIC_MODEL"], "my-local-tool-model")
+        self.assertNotIn("OPENROUTER_API_KEY", env)
+
+    def test_local_provider_does_not_accept_remote_http_url(self):
+        with self.assertRaisesRegex(ClaudeRuntimeError, "loopback"):
+            provider_env({"claude_code_local_anthropic_url": "http://example.com:8080",
+                          "claude_code_model": "my-local-model"})
+
+    def test_local_provider_requires_explicit_model_id(self):
+        with self.assertRaisesRegex(ClaudeRuntimeError, "claude_code_model"):
+            provider_env({"claude_code_local_anthropic_url": "http://localhost:8080"})
+
     def test_missing_api_key_fails_closed(self):
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}):
             with mock.patch("core.claude_runtime._read_json", return_value={}):
