@@ -2030,10 +2030,70 @@ TOOL_DECLARATIONS = [
 ]
 
 
+# Keep all GUI updates and permission dialogs in Qt's thread. The Claude
+# JSONL process and its stdin control channel run on a worker thread.
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+
+
+class ClaudeEventRouter(QObject):
+    received = pyqtSignal(object)
+    permission_requested = pyqtSignal(object)
+
+    def __init__(self, ui):
+        super().__init__(ui)
+        self._ui = ui
+        self.received.connect(self._show_event, Qt.ConnectionType.QueuedConnection)
+        self.permission_requested.connect(self._ask_permission, Qt.ConnectionType.QueuedConnection)
+
+    @pyqtSlot(object)
+    def _show_event(self, event):
+        kind = event.get("type", "")
+        if kind == "assistant":
+            content = (event.get("message") or {}).get("content") or []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "tool_use":
+                    self._ui.write_log("[Claude] Running tool: " + str(item.get("name", "unknown")))
+        elif kind == "system" and event.get("subtype") == "init":
+            self._ui.write_log("[Claude] Real source-build session initialized.")
+        elif kind == "result":
+            self._ui.write_log("[Claude] Session finished.")
+        elif kind == "control_request":
+            body = event.get("request") or {}
+            if body.get("subtype") == "can_use_tool":
+                self._ui.write_log("[Claude] Awaiting permission: " + str(body.get("tool_name", "tool")))
+
+    @pyqtSlot(object)
+    def _ask_permission(self, request_state):
+        from PyQt6.QtWidgets import QMessageBox
+        request = request_state["request"].get("request") or {}
+        name = str(request.get("tool_name") or "Claude Code tool")
+        details = json.dumps(request.get("input") or {}, ensure_ascii=False, indent=2)
+        dialog = QMessageBox(self._ui)
+        dialog.setWindowTitle("JARVIS / Claude Code — permission")
+        dialog.setIcon(QMessageBox.Icon.Question)
+        dialog.setTextFormat(Qt.TextFormat.PlainText)
+        dialog.setText("Allow Claude Code tool: " + name + "\n\n" + details[:2300])
+        dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        dialog.setDefaultButton(QMessageBox.StandardButton.No)
+        try:
+            request_state["allow"] = dialog.exec() == QMessageBox.StandardButton.Yes
+        finally:
+            request_state["answered"].set()
+
+    def approve(self, request):
+        state = {"request": request, "answered": threading.Event(), "allow": False}
+        self.permission_requested.emit(state)
+        if not state["answered"].wait(timeout=120):
+            return False
+        return state["allow"]
+
+
+
 class BrahmaLive:
 
     def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
         self.ui             = ui
+        self._claude_events = ClaudeEventRouter(ui)
         self._smart_home    = SmartHomeService()
         self.session        = None
         self.audio_in_queue = None
@@ -2480,7 +2540,9 @@ class BrahmaLive:
                     from actions.claude_code_bridge import run_developer_mode_request
                     res = run_developer_mode_request({
                         "description": text,
-                        "workspace_path": developer_workspace
+                        "workspace_path": developer_workspace,
+                        "_on_claude_event": self._claude_events.received.emit,
+                        "_approve_tool": self._claude_events.approve,
                     }, speak=None)
                     self.ui.write_log(f"[BrahmaDev] {res[:400]}")
 
@@ -4256,8 +4318,11 @@ class BrahmaLive:
                 # The real reconstructed Claude Code engine is now the JARVIS
                 # development capability. No disguised legacy-agent fallback.
                 from actions.claude_code_bridge import run_developer_mode_request
+                claude_args = dict(args)
+                claude_args["_on_claude_event"] = self._claude_events.received.emit
+                claude_args["_approve_tool"] = self._claude_events.approve
                 r = await loop.run_in_executor(
-                    None, lambda: run_developer_mode_request(args, speak=None)
+                    None, lambda: run_developer_mode_request(claude_args, speak=None)
                 )
                 result = r or "Claude Code finished without a textual result."
 
