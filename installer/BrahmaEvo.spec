@@ -4,6 +4,24 @@ import sys
 
 cwd = os.path.abspath(os.getcwd())
 
+# Package the reconstructed Claude Code build and the Node runtime, not the
+# official installed CLI. The full installer build sets REQUIRE=1 to fail
+# instead of silently shipping without the engine.
+claude_dist = os.path.join(cwd, 'runtime', 'claude-code', 'dist')
+node_binary = os.path.join(cwd, 'runtime', 'node', 'node.exe')
+runtime_datas = []
+if os.path.isfile(os.path.join(claude_dist, 'cli.js')) and os.path.isdir(
+    os.path.join(claude_dist, 'cli.bundle')
+):
+    runtime_datas.append((claude_dist, 'runtime/claude-code/dist'))
+if os.path.isfile(node_binary):
+    runtime_datas.append((node_binary, 'runtime/node'))
+if os.environ.get('BRAHMA_REQUIRE_CLAUDE_BUNDLE') == '1' and len(runtime_datas) != 2:
+    raise RuntimeError(
+        'Full JARVIS package requires runtime/claude-code/dist and '
+        'runtime/node/node.exe. Run installer/prepare_claude_runtime.ps1.'
+    )
+
 a = Analysis(
     [os.path.join(cwd, 'main.py')],
     pathex=[],
@@ -23,7 +41,7 @@ a = Analysis(
         (os.path.join(cwd, 'README.md'), '.'),
         (os.path.join(cwd, 'requirements.txt'), '.'),
         (os.path.join(cwd, 'version.txt'), '.')
-    ],
+    ] + runtime_datas,
     hiddenimports=[
         'mediapipe', 'cv2', 'instagrapi', 'google.genai', 'PyQt6', 'PyQt6.QtWebEngineCore',
         'PyQt6.QtWebEngineWidgets', 'PyQt6.QtWebChannel', 'pyautogui', 'sounddevice',
@@ -82,10 +100,41 @@ exe = EXE(
     version=os.path.join(cwd, 'version.txt') if os.path.exists(os.path.join(cwd, 'version.txt')) else None
 )
 
+# Dedicated console executable so Node's MCP stdio transport can communicate
+# with the exact same installed Brahma Windows desktop capabilities.
+mcp_analysis = Analysis(
+    [os.path.join(cwd, 'installer', 'brahma_mcp_launcher.py')],
+    pathex=[cwd],
+    binaries=[],
+    datas=[],
+    hiddenimports=['pyautogui', 'PIL.ImageGrab'],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+)
+mcp_pyz = PYZ(mcp_analysis.pure)
+mcp_exe = EXE(
+    mcp_pyz,
+    mcp_analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name='BrahmaMcp',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,
+)
+
 coll = COLLECT(
     exe,
+    mcp_exe,
     a.binaries,
+    mcp_analysis.binaries,
     a.datas,
+    mcp_analysis.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
