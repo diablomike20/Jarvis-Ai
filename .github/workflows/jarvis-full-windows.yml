@@ -53,6 +53,31 @@ jobs:
       - name: Smoke test packaged real Claude CLI and Windows MCP protocol
         shell: pwsh
         run: python installer/smoke_windows_claude.py dist/BrahmaEvo
+      - name: Install Inno Setup compiler if necessary
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to install Inno Setup compiler' }
+          }
+      - name: Create full Windows setup installer
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
+          if (-not (Test-Path $compiler)) { throw 'Inno Setup ISCC.exe not found' }
+          & $compiler 'installer/BrahmaJARVIS_Claude.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
+          if (-not (Test-Path 'installer/build_setup/BRAHMA-JARVIS-Claude-Full-Setup.exe')) {
+            throw 'Setup EXE artifact missing'
+          }
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: BRAHMA-JARVIS-Claude-Full-Windows-Setup
+          path: installer/build_setup/BRAHMA-JARVIS-Claude-Full-Setup.exe
+          retention-days: 7
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: success()
         with:
