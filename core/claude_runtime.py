@@ -147,12 +147,13 @@ def _terminate_tree(process: subprocess.Popen) -> None:
         return
     if os.name == "nt":
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
                 check=False,
             )
-            return
+            if result.returncode == 0:
+                return
         except (OSError, subprocess.TimeoutExpired):
             pass
     try:
