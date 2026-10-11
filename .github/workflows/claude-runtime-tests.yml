@@ -3,7 +3,7 @@ name: JARVIS Claude Runtime Smoke Tests
 on:
   push:
     branches:
-      - feature/jarvis-claude-full-runtime-20261011
+      - feature/jarvis-nextgen-working-runtime-20261011
   workflow_dispatch:
 
 permissions:
@@ -26,6 +26,8 @@ jobs:
         run: python -m py_compile main.py core/claude_runtime.py core/brahma_mcp_stdio.py actions/claude_code_bridge.py installer/brahma_mcp_launcher.py
       - name: Claude runtime (hermetic, no API key)
         run: python -m unittest discover -s tests -p test_claude_runtime.py -v
+      - name: One-time JARVIS-approved Windows MCP execution gate
+        run: python -m unittest discover -s tests -p test_claude_permission_broker.py -v
       - name: Brahma desktop MCP transport
         run: python -m unittest discover -s tests -p test_brahma_mcp_stdio.py -v
       - name: JARVIS AI startup regressions (no Gemini key)
