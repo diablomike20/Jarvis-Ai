@@ -1,0 +1,106 @@
+name: JARVIS installer forensic parity (read-only)
+on:
+  push:
+    branches:
+      - test/installer-byte-parity-20261011
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  compare-installed-to-portable:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: claude-2026-10-11-latest
+            run_id: 38152054654
+          - label: claude-2026-10-11-previous
+            run_id: 38129896803
+    steps:
+      - name: Download exact prior GitHub artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: diablomike20/Jarvis-Ai
+        run: |
+          New-Item -ItemType Directory -Force setup, portable | Out-Null
+          gh run download ${{ matrix.run_id }} --repo diablomike20/Jarvis-Ai --name BRAHMA-JARVIS-Claude-Full-Windows-Setup --dir setup
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download Setup artifact' }
+          gh run download ${{ matrix.run_id }} --repo diablomike20/Jarvis-Ai --name BRAHMA-JARVIS-Claude-Full-Windows-Preview --dir portable
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download Portable artifact' }
+      - name: Verify setup executable and install silently on isolated runner
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem setup -Recurse -File -Filter '*.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Downloaded setup EXE missing' }
+          $script:target = Join-Path $env:RUNNER_TEMP 'jarvis-installed'
+          New-Item -ItemType Directory -Force $script:target | Out-Null
+          $sha = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash
+          Write-Host "Setup SHA256: $sha; Setup bytes: $($exe.Length)"
+          $args = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$script:target", "/LOG=$(Join-Path $env:RUNNER_TEMP 'inno-install.log')")
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList $args -Wait -PassThru
+          Write-Host "Inno Setup exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $script:target 'BrahmaEvo.exe'))) { throw 'Installed main EXE missing' }
+      - name: SHA256 file-by-file parity and runtime protocol checks
+        shell: pwsh
+        run: |
+          @'
+          import os, pathlib, hashlib, json, subprocess, sys
+          root=pathlib.Path(os.environ['GITHUB_WORKSPACE'])
+          preview=root/'portable'
+          actual=pathlib.Path(os.environ['RUNNER_TEMP'])/'jarvis-installed'
+          report=root/'installer-parity.json'
+          def inventory(directory):
+              result={}
+              for f in directory.rglob('*'):
+                  if not f.is_file(): continue
+                  rel=f.relative_to(directory).as_posix()
+                  if rel.lower().startswith('unins000.'): continue
+                  digest=hashlib.sha256()
+                  with f.open('rb') as inp:
+                      for chunk in iter(lambda:inp.read(4*1024*1024),b''):digest.update(chunk)
+                  result[rel]={'bytes':f.stat().st_size,'sha256':digest.hexdigest()}
+              return result
+          p=inventory(preview)
+          a=inventory(actual)
+          missing=sorted(set(p)-set(a))
+          extra=sorted(set(a)-set(p))
+          mismatch=sorted(k for k in set(p)&set(a) if p[k]!=a[k])
+          summary={'portable_count':len(p),'installed_count':len(a),'portable_bytes':sum(x['bytes'] for x in p.values()), 'installed_bytes':sum(x['bytes'] for x in a.values()),'missing_count':len(missing),'extra_count':len(extra),'hash_mismatch_count':len(mismatch),'missing':missing[:100],'extra':extra[:100],'mismatch':mismatch[:100]}
+          for target,name in [(preview,'portable'),(actual,'installed')]:
+              base=target/'_internal'
+              node=base/'runtime'/'node'/'node.exe'
+              cli=base/'runtime'/'claude-code'/'dist'/'cli.js'
+              mcp=target/'BrahmaMcp.exe'
+              summary[name+'_required_exists']={str(x.relative_to(target)):x.is_file() for x in [target/'BrahmaEvo.exe',node,cli,mcp,base/'assets'/'web_background'/'index.html']}
+              if node.is_file() and cli.is_file():
+                  proc=subprocess.run([str(node),str(cli),'--version'],cwd=str(target),text=True,capture_output=True,timeout=60)
+                  summary[name+'_cli_version']={'exit_code':proc.returncode,'stdout':proc.stdout.strip()[:400],'stderr_tail':proc.stderr[-300:]}
+              if mcp.is_file():
+                  req=[{'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-03-26','capabilities':{},'clientInfo':{'name':'forensic','version':'1'}}},{'jsonrpc':'2.0','id':2,'method':'tools/list'}]
+                  proc=subprocess.run([str(mcp)],input=''.join(json.dumps(x)+'\n' for x in req),cwd=str(target),text=True,capture_output=True,timeout=60)
+                  try:
+                      messages=[json.loads(x) for x in proc.stdout.splitlines() if x.strip()]
+                      tools=messages[1].get('result',{}).get('tools',[]) if len(messages)>1 else []
+                      summary[name+'_mcp']={'exit_code':proc.returncode,'messages':len(messages),'tools':len(tools),'stderr_tail':proc.stderr[-300:]}
+                  except Exception as e:summary[name+'_mcp']={'error':str(e),'stdout_tail':proc.stdout[-300:]}
+          report.write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          assert not missing and not extra and not mismatch, 'SETUP / PORTABLE FILE BYTE-PARITY FAILED'
+          assert all(summary['installed_required_exists'].values()), 'Missing required installed components'
+          assert summary.get('installed_cli_version',{}).get('exit_code')==0, 'Installed CLI failed'
+          assert summary.get('installed_mcp',{}).get('tools',0)>=12, 'Installed MCP handshake failed'
+          '@ | Set-Content parity_check.py -Encoding UTF8
+          python parity_check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-parity-${{ matrix.label }}
+          path: |
+            installer-parity.json
+          if-no-files-found: ignore
