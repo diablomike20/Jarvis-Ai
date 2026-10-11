@@ -5163,6 +5163,92 @@ class BrahmaLive:
             stream.stop()
             stream.close()
 
+    async def _run_standalone_ai_mode(self, provider: str):
+        """Keep JARVIS text and microphone usable without Gemini Live.
+
+        The original application tied ALL voice capture to Gemini's realtime
+        session and aborted the run() loop before _listen_audio() when the
+        Gemini key was absent. Text routing remains in _on_text_command();
+        this independent listener provides microphone commands.
+        """
+        self.session = None
+        self._loop = asyncio.get_running_loop()
+        self.ui.set_state("LISTENING")
+        self.ui.write_log(
+            f"SYS: JARVIS online via {provider}. Text commands ready. "
+            "Standalone microphone uses online speech recognition."
+        )
+        _startup_log(f"standalone AI path selected: {provider}")
+        for label in ("Initialize audio", "Connect AI backend", "Finalize startup"):
+            try:
+                self.ui.boot_set_step_status(label, "done")
+            except Exception:
+                pass
+        try:
+            self.ui.boot_set_progress(100, f"{provider} command routing online")
+        except Exception:
+            pass
+
+        # STT must not be a precondition for TEXT input; failed microphone
+        # drivers or network recognition are visible errors, not silent blocks.
+        stop_listening = None
+        try:
+            stop_listening = await asyncio.to_thread(self._start_standalone_microphone)
+        except Exception as exc:
+            self.ui.write_log(
+                "ERR: Standalone microphone is unavailable: "
+                f"{type(exc).__name__}: {str(exc)[:200]}. Text chat remains available."
+            )
+            _startup_log(f"standalone microphone failed: {type(exc).__name__}: {exc}")
+        # A detached microphone callback operates independently of Gemini
+        # Live. Keep the main service alive until the user exits JARVIS.
+        try:
+            while True:
+                await asyncio.sleep(3)
+        finally:
+            if stop_listening is not None:
+                try:
+                    stop_listening(wait_for_stop=False)
+                except Exception:
+                    pass
+
+    def _start_standalone_microphone(self):
+        """Start free network STT for OpenRouter/Local when Live is absent."""
+        import speech_recognition as sr
+
+        recognizer = sr.Recognizer()
+        recognizer.dynamic_energy_threshold = True
+        language = str(config_manager.get_setting("speech_recognition_language", "hu-HU"))
+        mic = sr.Microphone()
+        with mic as source:
+            recognizer.adjust_for_ambient_noise(source, duration=0.5)
+        self.ui.write_log(
+            f"SYS: Microphone online ({language}). "
+            "Using online speech recognition; this is not offline STT."
+        )
+
+        def on_phrase(_recognizer, audio):
+            if self.ui.muted or getattr(self, "_is_speaking", False):
+                return
+            try:
+                text = _recognizer.recognize_google(audio, language=language)
+                if text and text.strip():
+                    self.ui.write_log(f"You (mic): {text}")
+                    self._on_text_command(text.strip(), source="mic")
+            except sr.UnknownValueError:
+                return  # Background noise/non-speech.
+            except Exception as exc:
+                now = time.monotonic()
+                last = getattr(self, "_last_stt_error_at", 0.0)
+                if now - last > 30:
+                    self._last_stt_error_at = now
+                    self.ui.write_log(
+                        "ERR: Microphone speech recognition failed: "
+                        f"{type(exc).__name__}: {str(exc)[:120]}"
+                    )
+
+        return recognizer.listen_in_background(mic, on_phrase, phrase_time_limit=10)
+
     async def run(self):
         # announce boot steps to UI overlay (thread-safe wrappers)
         try:
@@ -5198,8 +5284,34 @@ class BrahmaLive:
         except Exception:
             pass
 
+        # Select AI startup from the user's actual provider choice; a missing
+        # Gemini key must NEVER silence a valid OpenRouter/Local installation.
+        settings = config_manager.load_settings()
+        provider = settings.get("default_ai_provider", "Gemini")
+        keys = {}
+        try:
+            keys = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        gemini_key = str(keys.get("gemini_api_key") or "").strip()
+        openrouter_key = str(keys.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY") or "").strip()
+        if settings.get("offline_mode_enabled") or provider == "Local":
+            await self._run_standalone_ai_mode("Local")
+            return
+        if provider == "OpenRouter" or (not gemini_key and openrouter_key):
+            if not openrouter_key:
+                self.ui.write_log("ERR: OpenRouter API key missing. Set the key in JARVIS Settings.")
+            else:
+                if provider != "OpenRouter":
+                    config_manager.set_setting("default_ai_provider", "OpenRouter")
+                await self._run_standalone_ai_mode("OpenRouter")
+            return
+        if not gemini_key:
+            self.ui.write_log("ERR: No Gemini or OpenRouter key configured. Open JARVIS Settings.")
+            return
+
         client = genai.Client(
-            api_key=_get_api_key(),
+            api_key=gemini_key,
             http_options={"api_version": "v1beta"}
         )
 
