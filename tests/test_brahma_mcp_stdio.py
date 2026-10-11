@@ -22,6 +22,10 @@ class TestBrahmaMcp(unittest.TestCase):
             names = {x["name"] for x in mcp.dispatch({"method": "tools/list"})["tools"]}
         self.assertIn("desktop_screenshot", names)
         self.assertIn("desktop_click", names)
+        self.assertEqual(len(names), 12)
+        for name in ("desktop_double_click", "desktop_drag", "desktop_display_geometry",
+                     "desktop_frontmost_window", "desktop_running_apps", "desktop_installed_apps"):
+            self.assertIn(name, names)
         with mock.patch.object(mcp.os, "name", "posix"):
             self.assertEqual(mcp.dispatch({"method": "tools/list"})["tools"], [])
 
