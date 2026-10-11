@@ -123,9 +123,16 @@ class OpenRouterClient:
         if response_format:
             payload["response_format"] = response_format
 
+        # The first-run wizard writes credentials after this module is
+        # imported. Refresh credentials per request instead of caching a
+        # permanently empty token (one of the original silent-AI faults).
+        current_key = _load_api_key() or os.environ.get("OPENROUTER_API_KEY", "").strip()
+        if current_key != self.api_key:
+            self.api_key = current_key
+            self._headers["Authorization"] = f"Bearer {current_key}"
         if not self.api_key:
             raise PermissionError(
-                "[OpenRouter] API key is missing. Add a valid sk-or- key in config/api_keys.json."
+                "[OpenRouter] API key is missing. Configure OpenRouter in JARVIS Settings."
             )
 
         for attempt in range(1, MAX_RETRIES_PER_MODEL + 1):
