@@ -54,7 +54,7 @@ class Fixture(BaseHTTPRequestHandler):
                 "usage": {"output_tokens": 5}}),
             ("message_stop", {"type": "message_stop"}),
         ]
-        data = "".join("event: " + event + "\\ndata: " + json.dumps(message) + "\\n\\n"
+        data = "".join("event: " + event + "\ndata: " + json.dumps(message) + "\n\n"
                        for event, message in events).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -110,7 +110,7 @@ def main() -> int:
             "type": "user", "session_id": "",
             "message": {"role": "user", "content": "Reply with " + MARKER},
             "parent_tool_use_id": None,
-        }) + "\\n"
+        }) + "\n"
         with tempfile.TemporaryDirectory(prefix="jarvis-local-cli-") as cwd:
             result = subprocess.run(
                 [args.node, str(args.cli.resolve()), "--print", "--verbose",
