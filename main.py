@@ -5184,7 +5184,8 @@ class BrahmaLive:
         self._loop = asyncio.get_running_loop()
         self.ui.set_state("LISTENING")
         self.ui.write_log(
-            f"SYS: JARVIS online via {provider}. Text commands ready. "
+            f"SYS: JARVIS command router active ({provider} selected). "
+            "Text input ready; provider connection will be checked on first request. "
             "Standalone microphone uses online speech recognition."
         )
         _startup_log(f"standalone AI path selected: {provider}")
@@ -5209,6 +5210,11 @@ class BrahmaLive:
                 f"{type(exc).__name__}: {str(exc)[:200]}. Text chat remains available."
             )
             _startup_log(f"standalone microphone failed: {type(exc).__name__}: {exc}")
+        # OpenRouter-only mode must also exercise the JARVIS speaker; the old
+        # startup briefing was exclusively inside Gemini's receive loop.
+        if not self._startup_briefing_started and not getattr(self.ui, "muted", False):
+            self._startup_briefing_started = True
+            self.speak("JARVIS is online and ready.", proactive=True)
         # A detached microphone callback operates independently of Gemini
         # Live. Keep the main service alive until the user exits JARVIS.
         try:
