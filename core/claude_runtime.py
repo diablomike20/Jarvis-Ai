@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
 from core.user_paths import get_user_data_dir
+from core.claude_permission_broker import PermissionBroker
 
 OPENROUTER_URL = "https://openrouter.ai/api"
 END = object()
@@ -128,7 +129,7 @@ def provider_env(settings: dict, model: Optional[str] = None) -> dict[str, str]:
     return env
 
 
-def _native_windows_mcp() -> Optional[dict]:
+def _native_windows_mcp(broker: Optional[PermissionBroker] = None) -> Optional[dict]:
     """Create a local stdio MCP server backed by Brahma's Windows capabilities."""
     if os.name != "nt":
         return None
@@ -139,7 +140,10 @@ def _native_windows_mcp() -> Optional[dict]:
         command, args = str(executable), []
     else:
         command, args = sys.executable, ["-m", "core.brahma_mcp_stdio"]
-    return {"mcpServers": {"brahma_windows": {"command": command, "args": args}}}
+    configuration = {"command": command, "args": args}
+    if broker is not None:
+        configuration["env"] = broker.environment()
+    return {"mcpServers": {"brahma_windows": configuration}}
 
 
 def _terminate_tree(process: subprocess.Popen) -> None:
@@ -189,16 +193,24 @@ class ClaudeSession:
             cmd += ["--max-turns", str(max_turns)]
         if resume:
             cmd += ["--resume", str(resume)]
+        self._broker = None
         if self.settings.get("claude_code_windows_mcp", True):
-            native_mcp = _native_windows_mcp()
+            # The executor must independently validate one-time JARVIS user approvals.
+            self._broker = PermissionBroker() if os.name == "nt" else None
+            native_mcp = _native_windows_mcp(self._broker)
             if native_mcp:
                 cmd += ["--mcp-config", json.dumps(native_mcp)]
-        self._process = subprocess.Popen(
-            cmd, cwd=str(self.workspace), env=provider_env(self.settings, model_name),
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace", bufsize=1,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
-        )
+        try:
+            self._process = subprocess.Popen(
+                cmd, cwd=str(self.workspace), env=provider_env(self.settings, model_name),
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, encoding="utf-8", errors="replace", bufsize=1,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
+            )
+        except BaseException:
+            if self._broker is not None:
+                self._broker.close()
+            raise
         self._queue: queue.Queue = queue.Queue()
         self._stderr: list[str] = []
         self._write_lock = threading.Lock()
@@ -273,10 +285,18 @@ class ClaudeSession:
             {"behavior": "allow", "updatedInput": tool_input}
             if allow else {"behavior": "deny", "message": reason}
         )
-        self._send({
-            "type": "control_response",
-            "response": {"subtype": "success", "request_id": request_id, "response": decision},
-        })
+        grant_id = None
+        if allow and getattr(self, "_broker", None) is not None:
+            grant_id = self._broker.grant(str(body.get("tool_name") or ""), tool_input)
+        try:
+            self._send({
+                "type": "control_response",
+                "response": {"subtype": "success", "request_id": request_id, "response": decision},
+            })
+        except BaseException:
+            if grant_id is not None:
+                self._broker.revoke(grant_id)
+            raise
 
     def events(self, timeout: float = 300) -> Iterator[dict]:
         """Yield structured events; raises TimeoutError rather than hanging forever."""
@@ -308,6 +328,8 @@ class ClaudeSession:
             self.cancel()
         self._reader.join(timeout=1)
         self._err_reader.join(timeout=1)
+        if getattr(self, "_broker", None) is not None:
+            self._broker.close()
 
     def __enter__(self) -> "ClaudeSession":
         return self
@@ -335,7 +357,11 @@ def run_claude(prompt: str, workspace: str | Path, *,
             if event.get("type") == "control_request":
                 request = event.get("request") or {}
                 if request.get("subtype") == "can_use_tool":
-                    allow = bool(approve_tool(event)) if approve_tool else False
+                    # A callback exception is a denial, never implicit approval.
+                    try:
+                        allow = bool(approve_tool(event)) if approve_tool else False
+                    except Exception:
+                        allow = False
                     session.respond_permission(event, allow)
             if event.get("type") == "result":
                 result = event
