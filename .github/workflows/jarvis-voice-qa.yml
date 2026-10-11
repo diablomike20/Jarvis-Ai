@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - delivery/jarvis-ai-complete-2026-10-10
+      - feature/jarvis-nextgen-working-runtime-20261011
   workflow_dispatch:
 
 permissions:
