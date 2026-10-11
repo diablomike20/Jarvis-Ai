@@ -1,5 +1,6 @@
 """Guard against losing JARVIS features while merging real Claude support."""
 import hashlib
+import ast
 import re
 import unittest
 from pathlib import Path
@@ -39,6 +40,9 @@ class NextgenMergeIntegrity(unittest.TestCase):
         code = (ROOT / "or_client.py").read_text(encoding="utf-8")
         self.assertRegex(code, r"(?m)^MAX_FALLBACK_MODELS\s*=\s*[1-9]\d*")
         self.assertIn("if tried >= MAX_FALLBACK_MODELS:", code)
+        imports = [n for n in ast.parse(code).body if isinstance(n, ast.Import)]
+        self.assertTrue(any(a.name == "os" for n in imports for a in n.names))
+        self.assertIn("Only free models are permitted", code)
 
     def test_source_build_is_pinned_to_isolated_master_descendant(self):
         script = (ROOT / "installer/prepare_claude_runtime.ps1").read_text(encoding="utf-8")
