@@ -355,9 +355,16 @@ def probe_claude_runtime() -> dict:
         cli = resolve_cli(settings)
         node = resolve_node()
         key_present = bool(_openrouter_key())
+        native_mcp_ready = True
+        if settings.get("claude_code_windows_mcp", True) and os.name == "nt":
+            try:
+                _native_windows_mcp()
+            except ClaudeRuntimeError:
+                native_mcp_ready = False
         return {
-            "ready": key_present,
+            "ready": key_present and native_mcp_ready,
             "cli": str(cli), "node": node,
+            "windows_native_mcp_ready": native_mcp_ready,
             "openrouter_key_configured": key_present,
             "model": settings.get("claude_code_model", "openrouter/free"),
             "provider": "OpenRouter",
