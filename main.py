@@ -5293,25 +5293,21 @@ class BrahmaLive:
             keys = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             pass
-        gemini_key = str(keys.get("gemini_api_key") or "").strip()
-        openrouter_key = str(keys.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY") or "").strip()
-        if settings.get("offline_mode_enabled") or provider == "Local":
-            await self._run_standalone_ai_mode("Local")
+        from core.ai_startup import choose_startup_backend
+        keys["openrouter_api_key"] = keys.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY", "")
+        backend = choose_startup_backend(settings, keys)
+        if backend in ("Local", "OpenRouter"):
+            if backend != provider and provider in ("Gemini", "Google Gemini"):
+                self.ui.write_log("SYS: Preferred Gemini key unavailable; using configured OpenRouter instead.")
+                config_manager.set_setting("default_ai_provider", "OpenRouter")
+            await self._run_standalone_ai_mode(backend)
             return
-        if provider == "OpenRouter" or (not gemini_key and openrouter_key):
-            if not openrouter_key:
-                self.ui.write_log("ERR: OpenRouter API key missing. Set the key in JARVIS Settings.")
-            else:
-                if provider != "OpenRouter":
-                    config_manager.set_setting("default_ai_provider", "OpenRouter")
-                await self._run_standalone_ai_mode("OpenRouter")
-            return
-        if not gemini_key:
-            self.ui.write_log("ERR: No Gemini or OpenRouter key configured. Open JARVIS Settings.")
+        if backend == "Unconfigured":
+            self.ui.write_log("ERR: No AI provider configured. Set Gemini or OpenRouter key in Settings.")
             return
 
         client = genai.Client(
-            api_key=gemini_key,
+            api_key=str(keys["gemini_api_key"]).strip(),
             http_options={"api_version": "v1beta"}
         )
 
