@@ -26,6 +26,26 @@ def run_check(dist: Path) -> dict:
     if not gui.is_file() or not mcp.is_file():
         raise RuntimeError("BrahmaEvo.exe or BrahmaMcp.exe missing from package")
 
+    # Regression guard: the full original Brahma application must be present.
+    # The new installer is more compressed than the historical installer,
+    # so validate actual contents rather than guessing from archive size.
+    app_roots = [dist / "_internal", dist]
+    required = [
+        "assets/web_background/index.html",
+        "core/prompt.txt",
+        "actions",
+        "memory",
+        "plugins",
+        "features",
+        "brahma_connect",
+        "dashboard/static",
+        "smart_home",
+    ]
+    missing = [name for name in required
+               if not any((root / name).exists() for root in app_roots)]
+    if missing:
+        raise RuntimeError("Original Brahma content missing: " + ", ".join(missing))
+
     node = find_under(dist, "runtime/node/node.exe")
     cli = find_under(dist, "runtime/claude-code/dist/cli.js")
     manifest_path = find_under(dist, "runtime/claude-code/dist/claude-feature-manifest.json")
@@ -71,6 +91,9 @@ def run_check(dist: Path) -> dict:
     return {
         "compiled_feature_gates": len(compiled),
         "native_windows_mcp_tools": len(names),
+        "original_brahma_content_verified": required,
+        "packaged_files": sum(1 for item in dist.rglob("*") if item.is_file()),
+        "packaged_bytes": sum(item.stat().st_size for item in dist.rglob("*") if item.is_file()),
         "claude_cli_version": cli_version.stdout.strip(),
         "source_build_audit": manifest.get("reconstructedNativePackages", {}),
         "notes": "No cloud model call or GUI click included in smoke test.",
