@@ -82,7 +82,10 @@ def resolve_node() -> str:
     override = os.environ.get("BRAHMA_CLAUDE_NODE", "")
     if override and Path(override).is_file():
         return override
-    for root in [Path(sys.executable).resolve().parent, get_user_data_dir()]:
+    node_roots = [Path(sys.executable).resolve().parent, get_user_data_dir()]
+    if getattr(sys, "_MEIPASS", None):
+        node_roots.insert(0, Path(sys._MEIPASS))
+    for root in node_roots:
         exe = root / "runtime" / "node" / ("node.exe" if os.name == "nt" else "node")
         if exe.is_file():
             return str(exe)
@@ -115,10 +118,28 @@ def provider_env(settings: dict, model: Optional[str] = None) -> dict[str, str]:
         "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
         "PYTHONIOENCODING": "utf-8",
     })
+    # The subprocess may execute MCP child processes from a user's workspace:
+    # let Python resolve Brahma's core package when running from sources.
+    root = str(Path(__file__).resolve().parent.parent)
+    env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
     overrides = settings.get("claude_code_feature_overrides")
     if isinstance(overrides, dict):
         env["BRAHMA_CLAUDE_FEATURE_OVERRIDES"] = json.dumps(overrides, ensure_ascii=False)
     return env
+
+
+def _native_windows_mcp() -> Optional[dict]:
+    """Create a local stdio MCP server backed by Brahma's Windows capabilities."""
+    if os.name != "nt":
+        return None
+    if getattr(sys, "frozen", False):
+        executable = Path(sys.executable).resolve().with_name("BrahmaMcp.exe")
+        if not executable.is_file():
+            raise ClaudeRuntimeError("Hiányzó natív Windows híd: BrahmaMcp.exe")
+        command, args = str(executable), []
+    else:
+        command, args = sys.executable, ["-m", "core.brahma_mcp_stdio"]
+    return {"mcpServers": {"brahma_windows": {"command": command, "args": args}}}
 
 
 def _terminate_tree(process: subprocess.Popen) -> None:
@@ -167,6 +188,10 @@ class ClaudeSession:
             cmd += ["--max-turns", str(max_turns)]
         if resume:
             cmd += ["--resume", str(resume)]
+        if self.settings.get("claude_code_windows_mcp", True):
+            native_mcp = _native_windows_mcp()
+            if native_mcp:
+                cmd += ["--mcp-config", json.dumps(native_mcp)]
         self._process = subprocess.Popen(
             cmd, cwd=str(self.workspace), env=provider_env(self.settings, model_name),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
