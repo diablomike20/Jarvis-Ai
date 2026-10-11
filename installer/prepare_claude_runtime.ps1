@@ -3,7 +3,8 @@
 # The installed JARVIS does not need Git, npm, Bun, or network installation.
 param(
     [string]$ClaudeRepo = 'https://github.com/diablomike20/claude-code-source-build.git',
-    [string]$ClaudeBranch = 'feature/jarvis-claude-full-runtime-20261011'
+    [string]$ClaudeBranch = 'feature/jarvis-nextgen-working-runtime-20261011',
+    [string]$ClaudeCommit = '2f00cdd98359cfd52823b7aa254523b0106cd488'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -34,8 +35,18 @@ if (Test-Path (Join-Path $source '.git')) {
     if ($LASTEXITCODE -ne 0) { throw "Claude source clone failed" }
 }
 
+# Pin the exact tested commit from the isolated master-derived integration branch.
+& git -C $source checkout --detach $ClaudeCommit
+if ($LASTEXITCODE -ne 0) { throw "Cannot checkout expected Claude commit $ClaudeCommit" }
+$actualCommit = (& git -C $source rev-parse HEAD).Trim()
+if ($actualCommit -ne $ClaudeCommit) { throw "Wrong source commit: $actualCommit" }
+
 Push-Location $source
 try {
+    & node --check scripts/build-cli.mjs
+    if ($LASTEXITCODE -ne 0) { throw "Claude builder syntax invalid" }
+    & node --test scripts/tests/build-safety.test.mjs
+    if ($LASTEXITCODE -ne 0) { throw "Claude source-map security tests failed" }
     & node scripts/build-cli.mjs --list-features
     if ($LASTEXITCODE -ne 0) { throw "Claude compile-time feature discovery failed" }
     & node scripts/build-cli.mjs --max-features
@@ -58,6 +69,14 @@ Copy-Item -Recurse -Force (Join-Path $source 'dist') $dest
 New-Item -ItemType Directory -Path (Split-Path $nodeDest -Parent) -Force | Out-Null
 $nodeSource = (Get-Command node.exe -ErrorAction Stop).Source
 Copy-Item -Force $nodeSource $nodeDest
+
+@{
+    sourceRepository = $ClaudeRepo
+    sourceBranch = $ClaudeBranch
+    sourceCommit = $actualCommit
+    nodeVersion = ((& node --version).Trim())
+    featureManifest = 'claude-feature-manifest.json'
+} | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $dest 'brahma-source-provenance.json')
 
 Write-Host "Reconstructed Claude Code bundled at: $dest"
 Write-Host "Node bundled at: $nodeDest"
