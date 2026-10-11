@@ -1,5 +1,6 @@
 from core.user_paths import get_user_data_dir
 import json
+import os
 import sys
 import time
 import base64
@@ -85,6 +86,8 @@ class OpenRouterClient:
         temperature: float = DEFAULT_TEMPERATURE,
         response_format: Optional[dict] = None,
     ) -> Optional[str]:
+        if model != "openrouter/free" and not model.endswith(":free"):
+            raise PermissionError("[OpenRouter] Only free models are permitted.")
         # The user can configure an API key after startup; refresh it per request.
         self.api_key = _load_api_key()
         self._headers["Authorization"] = f"Bearer {self.api_key}"
