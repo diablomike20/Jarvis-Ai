@@ -72,8 +72,9 @@ VISION_MODELS: list[str] = [
 API_URL               = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MAX_TOKENS    = 4096
 DEFAULT_TEMPERATURE   = 0.7
-REQUEST_TIMEOUT       = 60   # seconds per request
-MAX_RETRIES_PER_MODEL = 2    # attempts before moving to next model
+REQUEST_TIMEOUT       = 18   # bounded cloud request; UI must not appear frozen for minutes
+MAX_RETRIES_PER_MODEL = 1    # avoid duplicate retries on exhausted free quotas
+MAX_FALLBACK_MODELS    = 4    # models remain selectable; cap attempts per user request
 RETRY_DELAY           = 2    # seconds between retries
 RATE_LIMIT_COOLDOWN   = 60   # seconds before retrying a rate-limited model
 
@@ -208,9 +209,15 @@ class OpenRouterClient:
             except PermissionError:
                 raise
 
+        tried = 0
         for m in pool:
             if self._is_rate_limited(m):
                 continue
+            if model and m == model:
+                continue
+            if tried >= MAX_FALLBACK_MODELS:
+                break
+            tried += 1
             logger.info(f"[OpenRouter] Trying: {m}")
             result = self._call(m, messages, max_tokens, temperature, response_format)
             if result:
