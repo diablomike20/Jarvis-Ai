@@ -9807,8 +9807,9 @@ class MainWindow(QMainWindow):
         if not API_FILE.exists():
             return False
         try:
+            from core.ai_startup import has_ai_credentials
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
-            return bool(d.get("gemini_api_key") or d.get("openrouter_api_key"))
+            return has_ai_credentials(d)
         except (OSError, ValueError):
             return False
 
