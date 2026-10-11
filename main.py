@@ -2477,14 +2477,17 @@ class BrahmaLive:
             def _run_brahma_dev():
                 try:
                     import webbrowser
-                    from actions.brahma_dev_agent import run_dev_agent
-                    res = run_dev_agent({
+                    from actions.claude_code_bridge import run_developer_mode_request
+                    res = run_developer_mode_request({
                         "description": text,
                         "workspace_path": developer_workspace
-                    }, speak=self.speak)
+                    }, speak=None)
                     self.ui.write_log(f"[BrahmaDev] {res[:400]}")
 
-                    if "encountered an error during inference" in res or "LLM error:" in res:
+                    if ("encountered an error during inference" in res
+                            or "LLM error:" in res
+                            or res.startswith("Claude Code integrációs hiba:")
+                            or res.startswith("Claude Code:")):
                         if hasattr(self.ui, "update_task_workspace"):
                             self.ui.update_task_workspace(status="Build Error", output=res, percent=0)
                         self.speak("There was an error building the project, sir. Please check the logs.")
