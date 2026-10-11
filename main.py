@@ -4250,9 +4250,13 @@ class BrahmaLive:
                 result = r or "Settings updated."
 
             elif name == "dev_agent":
-                from actions.dev_agent import dev_agent as da_run
-                r = await loop.run_in_executor(None, lambda: da_run(parameters=args, player=self.ui, speak=self.speak))
-                result = r or "Done."
+                # The real reconstructed Claude Code engine is now the JARVIS
+                # development capability. No disguised legacy-agent fallback.
+                from actions.claude_code_bridge import run_developer_mode_request
+                r = await loop.run_in_executor(
+                    None, lambda: run_developer_mode_request(args, speak=None)
+                )
+                result = r or "Claude Code finished without a textual result."
 
             elif name == "open_app":
                 r = await loop.run_in_executor(None, lambda: open_app(parameters=args, response=None, player=self.ui))
