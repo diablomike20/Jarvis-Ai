@@ -50,6 +50,9 @@ jobs:
           if (-not (Get-ChildItem $folder -Recurse -Filter node.exe)) { throw 'Bundled node.exe missing' }
           if (-not (Get-ChildItem $folder -Recurse -Filter claude-feature-manifest.json)) { throw 'Claude feature manifest missing' }
           Write-Host 'Full JARVIS EXE layout present.'
+      - name: Smoke test packaged real Claude CLI and Windows MCP protocol
+        shell: pwsh
+        run: python installer/smoke_windows_claude.py dist/BrahmaEvo
       - uses: actions/upload-artifact@v4
         if: success()
         with:
