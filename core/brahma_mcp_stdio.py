@@ -58,6 +58,41 @@ TOOLS = [
             "amount": {"type": "integer", "minimum": -100, "maximum": 100},
         }, "required": ["amount"]},
     },
+    {
+        "name": "desktop_double_click",
+        "description": "Double click a Windows desktop coordinate.",
+        "inputSchema": {"type": "object", "properties": {
+            "x": {"type": "integer"}, "y": {"type": "integer"},
+        }, "required": ["x", "y"]},
+    },
+    {
+        "name": "desktop_drag",
+        "description": "Drag from one coordinate to another with the left mouse button.",
+        "inputSchema": {"type": "object", "properties": {
+            "start_x": {"type": "integer"}, "start_y": {"type": "integer"},
+            "end_x": {"type": "integer"}, "end_y": {"type": "integer"},
+        }, "required": ["start_x", "start_y", "end_x", "end_y"]},
+    },
+    {
+        "name": "desktop_display_geometry",
+        "description": "Return the size of the primary Windows screen.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "desktop_frontmost_window",
+        "description": "Identify the current active Windows window title.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "desktop_running_apps",
+        "description": "List running Windows processes (process id and name).",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "desktop_installed_apps",
+        "description": "List applications registered in Windows uninstall registry.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -116,6 +151,54 @@ def _desktop_tool(name: str, args: dict) -> dict:
     if name == "desktop_scroll":
         pyautogui.scroll(_int(args.get("amount"), "amount", -100, 100))
         return _text("Scrolled.")
+    if name == "desktop_double_click":
+        pyautogui.doubleClick(_int(args.get("x"), "x"), _int(args.get("y"), "y"), interval=0.15)
+        return _text("Double-clicked.")
+    if name == "desktop_drag":
+        pyautogui.moveTo(_int(args.get("start_x"), "start_x"),
+                         _int(args.get("start_y"), "start_y"))
+        pyautogui.dragTo(_int(args.get("end_x"), "end_x"),
+                         _int(args.get("end_y"), "end_y"), duration=0.4)
+        return _text("Dragged.")
+    if name == "desktop_display_geometry":
+        width, height = pyautogui.size()
+        return _text(json.dumps({"display": "primary", "width": width, "height": height}))
+    if name == "desktop_frontmost_window":
+        import pygetwindow
+        window = pygetwindow.getActiveWindow()
+        return _text(json.dumps({"title": window.title if window else ""}, ensure_ascii=False))
+    if name == "desktop_running_apps":
+        import psutil
+        processes = []
+        for p in psutil.process_iter(["pid", "name"]):
+            try:
+                processes.append({"pid": p.info["pid"], "name": p.info["name"]})
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            if len(processes) >= 150:
+                break
+        return _text(json.dumps(processes, ensure_ascii=False))
+    if name == "desktop_installed_apps":
+        import winreg
+        collected = set()
+        reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            for arch in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
+                try:
+                    with winreg.OpenKey(hive, reg_path, 0, winreg.KEY_READ | arch) as root:
+                        count = winreg.QueryInfoKey(root)[0]
+                        for index in range(count):
+                            try:
+                                key = winreg.EnumKey(root, index)
+                                with winreg.OpenKey(root, key) as item:
+                                    name, _ = winreg.QueryValueEx(item, "DisplayName")
+                                    if isinstance(name, str) and name.strip():
+                                        collected.add(name.strip())
+                            except OSError:
+                                continue
+                except OSError:
+                    continue
+        return _text(json.dumps(sorted(collected)[:250], ensure_ascii=False))
     return _text(f"Unknown Brahma tool: {name}", True)
 
 
