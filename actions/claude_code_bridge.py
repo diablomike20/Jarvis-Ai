@@ -20,14 +20,20 @@ def _load_settings() -> dict[str, Any]:
 
 
 def _selected_workspace(parameters: dict[str, Any]) -> str:
-    settings = _load_settings()
-    return str(
+    # Explicit user paths are authoritative (and are validated by caller).
+    direct = (
         parameters.get("workspace_path")
         or parameters.get("project_dir")
         or parameters.get("output_dir")
-        or settings.get("developer_mode_workspace")
-        or Path.home() / "Desktop" / "BrahmaProjects"
-    ).strip()
+    )
+    if direct:
+        return str(direct).strip()
+    configured = str(_load_settings().get("developer_mode_workspace") or "").strip()
+    # Machine-specific settings checked into the old repository must not
+    # break installs on other users' Windows profiles.
+    if configured and Path(configured).expanduser().is_dir():
+        return configured
+    return str(Path.home() / "Desktop" / "BrahmaProjects")
 
 
 def run_developer_mode_request(parameters: dict[str, Any], speak=None) -> str:
