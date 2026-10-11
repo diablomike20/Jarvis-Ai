@@ -3,7 +3,7 @@ name: JARVIS Complete Windows EXE Preview
 on:
   push:
     branches:
-      - feature/jarvis-claude-full-runtime-20261011
+      - feature/jarvis-nextgen-working-runtime-20261011
     paths:
       - 'installer/**'
       - 'main.py'
@@ -13,6 +13,8 @@ on:
       - 'core/ai_startup.py'
       - 'core/claude_runtime.py'
       - 'core/brahma_mcp_stdio.py'
+      - 'core/claude_permission_broker.py'
+      - 'tests/**'
       - 'actions/claude_code_bridge.py'
       - '.github/workflows/jarvis-full-windows.yml'
   workflow_dispatch:
@@ -36,6 +38,9 @@ jobs:
       - name: Prepare reconstructed Claude Code and bundled Node
         shell: pwsh
         run: ./installer/prepare_claude_runtime.ps1
+      - name: Verify new JARVIS permission broker
+        shell: pwsh
+        run: python -m unittest discover -s tests -p test_claude_permission_broker.py -v
       - name: Install Brahma Python dependencies and PyInstaller
         shell: pwsh
         run: |
