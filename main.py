@@ -2094,6 +2094,8 @@ class BrahmaLive:
     def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
         self.ui             = ui
         self._claude_events = ClaudeEventRouter(ui)
+        from actions.claude_code_bridge import register_claude_callbacks
+        register_claude_callbacks(self._claude_events.received.emit, self._claude_events.approve)
         self._smart_home    = SmartHomeService()
         self.session        = None
         self.audio_in_queue = None
