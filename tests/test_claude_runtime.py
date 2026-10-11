@@ -110,7 +110,9 @@ class TestClaudeRuntime(unittest.TestCase):
                     with mock.patch("core.claude_runtime.resolve_node", return_value="node"):
                         with mock.patch("core.claude_runtime._settings", return_value={}):
                             with mock.patch("core.claude_runtime.subprocess.Popen", return_value=fake):
-                                result = run_claude("Fix bug", tmp, on_event=events.append, timeout=5)
+                                # The fake Popen also intercepts subprocess.run's taskkill.
+                                with mock.patch("core.claude_runtime._terminate_tree", side_effect=lambda proc: proc.terminate()):
+                                    result = run_claude("Fix bug", tmp, on_event=events.append, timeout=5)
         self.assertEqual(result["text"], "Done.")
         self.assertEqual(result["session_id"], "sess-1")
         self.assertEqual(len(events), 3)
