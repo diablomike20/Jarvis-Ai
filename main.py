@@ -2040,8 +2040,12 @@ class ClaudeEventRouter(QObject):
     permission_requested = pyqtSignal(object)
 
     def __init__(self, ui):
-        super().__init__(ui)
+        # BrahmaLive is constructed from the runner thread, whereas the UI
+        # belongs to the GUI thread. This QObject must move to the UI thread
+        # before queued permission dialogs can be safely delivered.
+        super().__init__()
         self._ui = ui
+        self.moveToThread(ui.thread())
         self.received.connect(self._show_event, Qt.ConnectionType.QueuedConnection)
         self.permission_requested.connect(self._ask_permission, Qt.ConnectionType.QueuedConnection)
 
