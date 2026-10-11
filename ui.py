@@ -6167,6 +6167,17 @@ class SetupOverlay(QWidget):
         status_row.addWidget(hint)
         blay.addLayout(status_row)
 
+        # JARVIS must not require an unrelated Gemini subscription/key merely
+        # to use its OpenRouter-based Claude Code runtime.
+        openrouter_only = QPushButton("Use OpenRouter instead (no Gemini key)")
+        openrouter_only.setCursor(Qt.CursorShape.PointingHandCursor)
+        openrouter_only.setStyleSheet(
+            "QPushButton { background: transparent; color: #00e5ff; border: none; "
+            "text-decoration: underline; }"
+        )
+        openrouter_only.clicked.connect(self._start_openrouter_only_setup)
+        blay.addWidget(openrouter_only)
+
         blay.addStretch()
 
         lay.addWidget(self._s3_box, 0, Qt.AlignmentFlag.AlignCenter)
@@ -6267,6 +6278,12 @@ class SetupOverlay(QWidget):
             """)
             QTimer.singleShot(1800, self._show_or_prompt)
 
+
+    def _start_openrouter_only_setup(self):
+        """Skip Gemini, use the existing OpenRouter key entry step directly."""
+        self._key_input.setText("")
+        self._or_prompt_widget = self._s3_box
+        self._show_or_input()
 
     def _show_or_prompt(self):
         """After Gemini verified, ask if user wants to add OpenRouter too."""
@@ -9786,12 +9803,13 @@ class MainWindow(QMainWindow):
                 self._result_card.set_body("Action completed")
 
     def _check_config(self) -> bool:
-        if not API_FILE.exists(): return False
+        """OpenRouter-only and Gemini-only are both valid JARVIS configurations."""
+        if not API_FILE.exists():
+            return False
         try:
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
-            return (bool(d.get("gemini_api_key")) and
-                    bool(d.get("os_system")))
-        except Exception:
+            return bool(d.get("gemini_api_key") or d.get("openrouter_api_key"))
+        except (OSError, ValueError):
             return False
 
     def _apply_scan_state(self, enabled: bool, text: str = ""):
@@ -10016,8 +10034,17 @@ class MainWindow(QMainWindow):
                 }, indent=4),
                 encoding="utf-8",
             )
-            self._ready = True
-            self._api_ready = True
+            self._ready = self._check_config()
+            self._api_ready = self._ready
+            # First-run users may choose OpenRouter without a Gemini key.
+            if or_key and not key:
+                provider_settings = self._load_app_settings()
+                provider_settings["default_ai_provider"] = "OpenRouter"
+                provider_settings["offline_mode_enabled"] = False
+                self._save_app_settings(provider_settings)
+            if not self._ready:
+                self._log.append_log("ERR: Configure Gemini or OpenRouter API key to start AI.")
+                return
             if self._overlay:
                 self._overlay.hide()
                 self._overlay.deleteLater()
