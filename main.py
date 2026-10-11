@@ -2473,7 +2473,7 @@ class BrahmaLive:
 
         developer_settings = self.ui._load_app_settings() if hasattr(self.ui, "_load_app_settings") else {}
         developer_workspace = str(developer_settings.get("developer_mode_workspace", "")).strip()
-        if not developer_workspace:
+        if not developer_workspace or not Path(developer_workspace).is_dir():
             developer_workspace = str(Path.home() / "Desktop" / "BrahmaProjects")
             Path(developer_workspace).mkdir(parents=True, exist_ok=True)
 
