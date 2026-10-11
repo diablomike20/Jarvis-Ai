@@ -10,7 +10,7 @@ APPROVED_DELIVERY_HUD_BLOB = "81eca8399c0e92206ac79b88d8e62dbdad3a3a0c"
 
 class NextgenMergeIntegrity(unittest.TestCase):
     def test_original_delivery_hud_is_unchanged(self):
-        content = (ROOT / "assets/web_background/index.html").read_bytes()
+        content = (ROOT / "assets/web_background/index.html").read_bytes().replace(b"\r\n", b"\n")
         git_blob = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
         self.assertEqual(git_blob, APPROVED_DELIVERY_HUD_BLOB)
 

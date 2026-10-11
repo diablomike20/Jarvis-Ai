@@ -54,7 +54,7 @@ def run_check(dist: Path) -> dict:
 
     # Exact original JARVIS delivery HUD (do not swap to an unrequested orb).
     import hashlib
-    hud = find_under(dist, "assets/web_background/index.html").read_bytes()
+    hud = find_under(dist, "assets/web_background/index.html").read_bytes().replace(b"\r\n", b"\n")
     hud_blob = hashlib.sha1(b"blob " + str(len(hud)).encode() + b"\0" + hud).hexdigest()
     if hud_blob != "81eca8399c0e92206ac79b88d8e62dbdad3a3a0c":
         raise RuntimeError("Original approved delivery HUD bytes changed")
