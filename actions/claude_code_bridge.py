@@ -76,12 +76,11 @@ def run_developer_mode_request(parameters: dict[str, Any], speak=None) -> str:
 
     event_handler = params.get("_on_claude_event")
     approval_handler = params.get("_approve_tool")
-    timeout = float(params.get("timeout") or 300)
-    timeout = min(max(timeout, 10), 3600)
-    turns = params.get("max_turns")
-    max_turns = int(turns) if turns is not None else None
-
     try:
+        timeout = float(params.get("timeout") or 300)
+        timeout = min(max(timeout, 10), 3600)
+        turns = params.get("max_turns")
+        max_turns = int(turns) if turns is not None else None
         result = run_claude(
             description, workspace,
             model=params.get("model"),
