@@ -3768,6 +3768,7 @@ class BrahmaLive:
             except Exception:
                 pass
             reply = ""
+            provider_errors = []
             gemini_first = not self._use_openrouter_first
             request_text = f"{memory_ctx}\n\nCurrent User Request:\n{text}" if memory_ctx else text
 
@@ -3811,7 +3812,11 @@ class BrahmaLive:
                     )
                     print("[BRAHMA EVO] 🌐 OpenRouter answered successfully!")
                 except Exception as e_or:
-                    print(f"[BRAHMA EVO] ⚠️ OpenRouter failed: {e_or}")
+                    problem = f"{type(e_or).__name__}: {str(e_or)[:260]}"
+                    provider_errors.append(problem)
+                    self.ui.write_log("ERR: OpenRouter AI unavailable: " + problem)
+                    _startup_log("OpenRouter text request failed: " + problem)
+                    print(f"[BRAHMA EVO] ⚠️ OpenRouter failed: {problem}")
 
             # 3. If user explicitly configured Local AI, is in Offline Mode, or cloud provider failed: run Local Brain
             if not reply and (configured_provider == "Local" or is_offline_mode or not (is_cloud_gemini or is_cloud_openrouter)) and local_brain.is_available():
@@ -3940,7 +3945,11 @@ class BrahmaLive:
                     print(f"[BRAHMA EVO] ⚠️ Offline Local Brain fallback failed: {e_net}")
             reply = (reply or "").strip()
             if not reply:
-                reply = "I’m ready, sir."
+                if provider_errors:
+                    reply = ("Az OpenRouter nem tudott válaszolni: "
+                             + "; ".join(provider_errors)[:360])
+                else:
+                    reply = "Nem sikerült AI-választ kérni. Ellenőrizd az API-kulcsot és a kapcsolatot."
             self.ui.write_log(f"Brahma Evo: {reply}")
             if not getattr(self.ui, "muted", False):
                 self.speak(reply, proactive=True)
