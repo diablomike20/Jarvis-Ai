@@ -9804,6 +9804,8 @@ class MainWindow(QMainWindow):
 
     def _check_config(self) -> bool:
         """OpenRouter-only and Gemini-only are both valid JARVIS configurations."""
+        if os.environ.get("OPENROUTER_API_KEY", "").strip():
+            return True
         if not API_FILE.exists():
             return False
         try:
