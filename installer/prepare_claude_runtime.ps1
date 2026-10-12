@@ -4,7 +4,7 @@
 param(
     [string]$ClaudeRepo = 'https://github.com/diablomike20/claude-code-source-build.git',
     [string]$ClaudeBranch = 'feature/jarvis-nextgen-working-runtime-20261011',
-    [string]$ClaudeCommit = '87c8935ba6c94832ca4a4b07333fecfcdff2f0e3',
+    [string]$ClaudeCommit = '1860c0eda0415d7a34aafcbeb48aac8995bbdc61',
     [string]$DonorRepo = 'https://github.com/diablomike20/claude-code.git',
     [string]$DonorCommit = '6ee4529f1f62631c70c948b6e654ba95668d0c6e'
 )
@@ -66,7 +66,7 @@ Push-Location $source
 try {
     & node --check scripts/build-cli.mjs
     if ($LASTEXITCODE -ne 0) { throw "Claude builder syntax invalid" }
-    & node --test scripts/tests/build-safety.test.mjs scripts/tests/donor-source.test.mjs scripts/tests/proactive-runtime.test.mjs
+    & node --test scripts/tests/build-safety.test.mjs scripts/tests/donor-source.test.mjs scripts/tests/proactive-runtime.test.mjs scripts/tests/skill-discovery.test.mjs
     if ($LASTEXITCODE -ne 0) { throw "Claude source recovery and security tests failed" }
     & node scripts/build-cli.mjs --list-features
     if ($LASTEXITCODE -ne 0) { throw "Claude compile-time feature discovery failed" }
