@@ -9,6 +9,8 @@ on:
       - tests/test_voice_tts_compare.py
       - tests/test_voice_reference_preflight.py
       - tests/test_marecord_bootstrap.py
+      - tests/test_voice_style_variants.py
+      - tests/test_local_transcribe_hu.py
       - .github/workflows/voice-corpus-prep.yml
   workflow_dispatch:
 
@@ -25,10 +27,12 @@ jobs:
         with:
           python-version: '3.11'
       - name: Syntax checks
-        run: python -m py_compile tools/voice_corpus/*.py tests/test_voice_corpus_prep.py tests/test_voice_tts_compare.py tests/test_voice_reference_preflight.py tests/test_marecord_bootstrap.py
+        run: python -m py_compile tools/voice_corpus/*.py tests/test_voice_corpus_prep.py tests/test_voice_tts_compare.py tests/test_voice_reference_preflight.py tests/test_marecord_bootstrap.py tests/test_voice_style_variants.py tests/test_local_transcribe_hu.py
       - name: Offline privacy and mock TTS tests
         run: |
           python -m unittest discover -s tests -p 'test_voice_corpus_prep.py' -v
           python -m unittest discover -s tests -p 'test_voice_tts_compare.py' -v
           python -m unittest discover -s tests -p 'test_voice_reference_preflight.py' -v
           python -m unittest discover -s tests -p 'test_marecord_bootstrap.py' -v
+          python -m unittest discover -s tests -p 'test_voice_style_variants.py' -v
+          python -m unittest discover -s tests -p 'test_local_transcribe_hu.py' -v
