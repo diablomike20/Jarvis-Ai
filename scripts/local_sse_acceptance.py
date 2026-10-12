@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import queue
+import time
 import subprocess
 import sys
 import tempfile
@@ -21,7 +23,14 @@ MARKER = "JARVIS_SOURCE_BUILD_SSE_OK"
 
 
 class Fixture(BaseHTTPRequestHandler):
+    requests_seen = 0
+    request_paths = []
+    lock = threading.Lock()
+
     def do_POST(self):
+        with self.lock:
+            type(self).requests_seen += 1
+            type(self).request_paths.append(self.path[:120])
         try:
             length = int(self.headers.get("Content-Length", "0"))
             request = json.loads(self.rfile.read(length or 0))
@@ -111,34 +120,107 @@ def main() -> int:
             "message": {"role": "user", "content": "Reply with " + MARKER},
             "parent_tool_use_id": None,
         }) + "\n"
+        # Keep stdin open until the SDK emits a result. subprocess.run(input=...)
+        # closes stdin as soon as the single JSONL message has been sent; that
+        # is not representative of JARVIS's long-lived bidirectional session.
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+        stdout_queue: queue.Queue[str | None] = queue.Queue()
+        finished = False
+        timed_out = False
+        stdin_error = ""
         with tempfile.TemporaryDirectory(prefix="jarvis-local-cli-") as cwd:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 [args.node, str(args.cli.resolve()), "--print", "--verbose",
                  "--input-format", "stream-json", "--output-format", "stream-json",
                  "--permission-prompt-tool", "stdio", "--model", "jarvis-local-stub"],
-                input=packet, text=True, encoding="utf-8", errors="replace",
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=cwd,
-                timeout=args.timeout,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, encoding="utf-8", errors="replace", env=env, cwd=cwd,
+                bufsize=1,
             )
-        messages = []
-        for line in result.stdout.splitlines():
+            def read_stdout():
+                for line in process.stdout:
+                    stdout_queue.put(line)
+                stdout_queue.put(None)
+
+            def read_stderr():
+                for line in process.stderr:
+                    stderr_lines.append(line)
+
+            out_thread = threading.Thread(target=read_stdout, daemon=True)
+            err_thread = threading.Thread(target=read_stderr, daemon=True)
+            out_thread.start()
+            err_thread.start()
+            messages: list[dict] = []
             try:
-                v = json.loads(line)
-                if isinstance(v, dict):
-                    messages.append(v)
-            except ValueError:
-                pass
+                process.stdin.write(packet)
+                process.stdin.flush()
+                # Do not close stdin here: control_request/control_response
+                # must remain possible during a complete CLI turn.
+                deadline = time.monotonic() + args.timeout
+                while time.monotonic() < deadline:
+                    try:
+                        line = stdout_queue.get(timeout=0.25)
+                    except queue.Empty:
+                        if process.poll() is not None and not out_thread.is_alive():
+                            break
+                        continue
+                    if line is None:
+                        break
+                    stdout_lines.append(line)
+                    try:
+                        value = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(value, dict):
+                        messages.append(value)
+                        if value.get("type") == "result":
+                            finished = True
+                            break
+                else:
+                    timed_out = True
+            except (BrokenPipeError, OSError) as exc:
+                stdin_error = type(exc).__name__
+            finally:
+                if process.stdin and not process.stdin.closed:
+                    try:
+                        process.stdin.close()
+                    except OSError:
+                        pass
+                if process.poll() is None:
+                    try:
+                        process.wait(timeout=5 if finished else 1)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=5)
+                out_thread.join(timeout=2)
+                err_thread.join(timeout=2)
+            returncode = process.returncode
+
+        # Structured evidence: no credentials or arbitrary request bodies.
         completed = [m for m in messages if m.get("type") == "result"]
-        ok = result.returncode == 0 and any(MARKER in str(m.get("result") or "") for m in completed)
-        print(json.dumps({
+        ok = (
+            returncode == 0 and
+            any(MARKER in str(m.get("result") or "") for m in completed)
+        )
+        summary = {
             "stage": "actual_compiled_cli_local_sse",
             "status": "PASS" if ok else "FAIL",
-            "process_returncode": result.returncode,
-            "event_types": [m.get("type") for m in messages],
+            "process_returncode": returncode,
+            "event_types": [m.get("type") for m in messages[:30]],
             "result_event_present": bool(completed),
             "expected_fixture_token": ok,
-            "stderr_tail": result.stderr[-1000:] if not ok else "",
-        }, ensure_ascii=False))
+            "stdin_kept_open_until_result": finished,
+            "timed_out": timed_out,
+            "stdin_error": stdin_error,
+            "fixture_requests": Fixture.requests_seen,
+            "fixture_paths": Fixture.request_paths[:12],
+            "stdout_len": sum(len(x.encode("utf-8")) for x in stdout_lines),
+            "stdout_prefix": "".join(stdout_lines)[:1200].replace("jarvis-local", "[LOCAL]"),
+            "stderr_len": sum(len(x.encode("utf-8")) for x in stderr_lines),
+            "stderr_tail": "".join(stderr_lines)[-1200:].replace("jarvis-local", "[LOCAL]"),
+        }
+        print(json.dumps(summary, ensure_ascii=False))
         return 0 if ok else 1
     except subprocess.TimeoutExpired:
         print(json.dumps({"stage": "actual_compiled_cli_local_sse", "status": "TIMEOUT"}))
