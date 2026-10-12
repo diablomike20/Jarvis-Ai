@@ -74,7 +74,7 @@ def preflight(src: Path) -> dict:
         "-map", "0:a:0", "-vn", "-af",
         "volumedetect,silencedetect=noise=-35dB:d=0.40", "-f", "null", "-"])
     def volume(name: str):
-        match = re.search(rf"\\b{name}:\\s*(-?(?:[0-9.]+|inf))\\s*dB", log)
+        match = re.search(rf"\b{name}:\s*(-?(?:[0-9.]+|inf))\s*dB", log)
         if not match:
             return None
         try:
