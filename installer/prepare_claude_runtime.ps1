@@ -4,7 +4,7 @@
 param(
     [string]$ClaudeRepo = 'https://github.com/diablomike20/claude-code-source-build.git',
     [string]$ClaudeBranch = 'feature/jarvis-nextgen-working-runtime-20261011',
-    [string]$ClaudeCommit = '3b63b06c21a9ebddb5ed2e95d86349193997995b'
+    [string]$ClaudeCommit = 'aba8b4d778ea57b7faaa8a4006a8bd86f859af3d'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
