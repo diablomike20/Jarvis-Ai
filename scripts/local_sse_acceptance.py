@@ -261,6 +261,8 @@ def main() -> int:
             "process_returncode": returncode,
             "event_types": [m.get("type") for m in messages[:30]],
             "result_event_present": bool(completed),
+            "result_errors": [str(e)[:240] for m in completed for e in (m.get("errors") or [])][:5],
+            "result_subtypes": [m.get("subtype") for m in completed],
             "expected_fixture_token": ok,
             "stdin_kept_open_until_result": finished,
             "timed_out": timed_out,
