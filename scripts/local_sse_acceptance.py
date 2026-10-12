@@ -25,7 +25,9 @@ MARKER = "JARVIS_SOURCE_BUILD_SSE_OK"
 
 class Fixture(BaseHTTPRequestHandler):
     requests_seen = 0
+    message_requests_seen = 0
     request_paths = []
+    scenario = 'normal'
     lock = threading.Lock()
 
     def do_POST(self):
@@ -41,11 +43,23 @@ class Fixture(BaseHTTPRequestHandler):
             return self._send_json({"input_tokens": 10})
         if "/messages" not in self.path:
             return self._send_json({"error": {"type": "not_found_error", "message": "Unknown path"}}, 404)
+        with self.lock:
+            type(self).message_requests_seen += 1
+            request_index = type(self).message_requests_seen
+        if type(self).scenario == "overflow" and request_index == 1:
+            return self._send_json({
+                "type": "error",
+                "error": {"type": "invalid_request_error", "message": "Prompt is too long"},
+            }, 400)
+        response_text = (
+            "Summary of the user's goal: reply with the requested marker; no tools required."
+            if type(self).scenario == "overflow" and request_index == 2 else MARKER
+        )
         model = request.get("model") or "jarvis-stub"
         if not request.get("stream"):
             return self._send_json({
                 "id": "msg_jarvis_fixture", "type": "message", "role": "assistant",
-                "model": model, "content": [{"type": "text", "text": MARKER}],
+                "model": model, "content": [{"type": "text", "text": response_text}],
                 "stop_reason": "end_turn", "stop_sequence": None,
                 "usage": {"input_tokens": 10, "output_tokens": 5},
             })
@@ -57,7 +71,7 @@ class Fixture(BaseHTTPRequestHandler):
             ("content_block_start", {"type": "content_block_start", "index": 0,
                 "content_block": {"type": "text", "text": ""}}),
             ("content_block_delta", {"type": "content_block_delta", "index": 0,
-                "delta": {"type": "text_delta", "text": MARKER}}),
+                "delta": {"type": "text_delta", "text": response_text}}),
             ("content_block_stop", {"type": "content_block_stop", "index": 0}),
             ("message_delta", {"type": "message_delta",
                 "delta": {"stop_reason": "end_turn", "stop_sequence": None},
@@ -94,9 +108,14 @@ def main() -> int:
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--node", default="node")
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--scenario", choices=["normal", "overflow"], default="normal")
     args = parser.parse_args()
     if not args.cli.is_file():
         parser.error("Compiled Claude CLI is missing: " + str(args.cli))
+    Fixture.scenario = args.scenario
+    Fixture.requests_seen = 0
+    Fixture.message_requests_seen = 0
+    Fixture.request_paths = []
     server = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -253,10 +272,13 @@ def main() -> int:
         completed = [m for m in messages if m.get("type") == "result"]
         ok = (
             returncode == 0 and
-            any(MARKER in str(m.get("result") or "") for m in completed)
+            any(MARKER in str(m.get("result") or "") for m in completed) and
+            (args.scenario != "overflow" or Fixture.message_requests_seen >= 3)
         )
         summary = {
             "stage": "actual_compiled_cli_local_sse",
+            "scenario": args.scenario,
+            "message_requests": Fixture.message_requests_seen,
             "status": "PASS" if ok else "FAIL",
             "process_returncode": returncode,
             "event_types": [m.get("type") for m in messages[:30]],
