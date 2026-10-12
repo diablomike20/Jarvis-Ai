@@ -85,6 +85,13 @@ try {
         $manifest.originalSourceRecovery.commit -ne $actualDonorCommit) {
         throw "Source donor verification failed: original Claude files were not reviewed"
     }
+    $donorImported = @($manifest.originalSourceRecovery.imported).Count
+    $donorPreserved = @($manifest.originalSourceRecovery.preserved).Count
+    $donorReviewed = @($manifest.originalSourceRecovery.reviewedAllowlist).Count
+    if ($donorImported + $donorPreserved -ne $donorReviewed -or $donorReviewed -ne 10) {
+        throw "Original donor source review incomplete: imported $donorImported, preserved $donorPreserved, expected 10"
+    }
+    Write-Host "Original donor source audit: imported=$donorImported, preserved=$donorPreserved, reviewed=$donorReviewed"
     $partialFeatures = @($manifest.optionalModuleAudit.PSObject.Properties |
         Where-Object { $_.Value.status -ne 'source-present-runtime-not-proven' } |
         ForEach-Object { $_.Name })
