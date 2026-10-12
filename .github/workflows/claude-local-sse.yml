@@ -34,3 +34,6 @@ jobs:
       - name: Exercise actual Node CLI and structured JSONL against local Anthropic SSE server
         shell: pwsh
         run: python scripts/local_sse_acceptance.py --cli runtime/claude-code/dist/cli.js --node runtime/node/node.exe --timeout 100
+      - name: Exercise live prompt overflow and original Claude compaction recovery
+        shell: pwsh
+        run: python scripts/local_sse_acceptance.py --cli runtime/claude-code/dist/cli.js --node runtime/node/node.exe --scenario overflow --timeout 150
