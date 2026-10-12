@@ -19,6 +19,8 @@ param(
     [ValidateRange(0, 24)]
     [int]$MaxClips = 8,
 
+    [string]$PythonExe = '',
+
     [switch]$AutoTranscript,
 
     [ValidateSet('tiny', 'base', 'small', 'medium', 'large-v3-turbo')]
@@ -50,6 +52,13 @@ if ($LabPath.TrimEnd('\') -eq $Repo.TrimEnd('\') -or
     throw 'Private audio output must be OUTSIDE the Git repository.'
 }
 
+if ($PythonExe) {
+    if (-not (Test-Path -LiteralPath $PythonExe -PathType Leaf)) {
+        throw "Python interpreter not found: $PythonExe"
+    }
+    $Python = (Resolve-Path -LiteralPath $PythonExe).Path
+    $PyPrefix = @()
+} else {
 $pyCmd = Get-Command py -ErrorAction SilentlyContinue
 if ($pyCmd) {
     $Python = $pyCmd.Source
@@ -61,6 +70,7 @@ if ($pyCmd) {
     }
     $Python = $pyCmd.Source
     $PyPrefix = @()
+}
 }
 
 & $Python @PyPrefix --version
