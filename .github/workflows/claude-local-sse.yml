@@ -28,6 +28,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Build exact custom master-derived Claude CLI
         shell: pwsh
+        env:
+          JARVIS_CLAUDE_UNMINIFIED: '1'
         run: ./installer/prepare_claude_runtime.ps1
       - name: Exercise actual Node CLI and structured JSONL against local Anthropic SSE server
         shell: pwsh
