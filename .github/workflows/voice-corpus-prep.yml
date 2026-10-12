@@ -1,0 +1,27 @@
+name: Hungarian voice corpus prep checks
+on:
+  push:
+    branches:
+      - prep/jarvis-hu-film-voice-corpus-20261012
+    paths:
+      - tools/voice_corpus/**
+      - tests/test_voice_corpus_prep.py
+      - .github/workflows/voice-corpus-prep.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-unit-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Syntax check
+        run: python -m py_compile tools/voice_corpus/prepare_corpus.py tests/test_voice_corpus_prep.py
+      - name: Offline privacy and corpus checks
+        run: python -m unittest discover -s tests -p 'test_voice_corpus_prep.py' -v
