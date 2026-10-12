@@ -4,7 +4,7 @@
 param(
     [string]$ClaudeRepo = 'https://github.com/diablomike20/claude-code-source-build.git',
     [string]$ClaudeBranch = 'feature/jarvis-nextgen-working-runtime-20261011',
-    [string]$ClaudeCommit = '5af568e8f837acbc9bf88f61eef443f68e894129',
+    [string]$ClaudeCommit = 'd67dc4cae568c3fd2ab5a1fadb25d3852a759621',
     [string]$DonorRepo = 'https://github.com/diablomike20/claude-code.git',
     [string]$DonorCommit = '6ee4529f1f62631c70c948b6e654ba95668d0c6e'
 )
@@ -66,7 +66,7 @@ Push-Location $source
 try {
     & node --check scripts/build-cli.mjs
     if ($LASTEXITCODE -ne 0) { throw "Claude builder syntax invalid" }
-    & node --test scripts/tests/build-safety.test.mjs scripts/tests/donor-source.test.mjs scripts/tests/proactive-runtime.test.mjs scripts/tests/skill-discovery.test.mjs scripts/tests/skill-prefetch.test.mjs
+    & node --test scripts/tests/build-safety.test.mjs scripts/tests/donor-source.test.mjs scripts/tests/proactive-runtime.test.mjs scripts/tests/skill-discovery.test.mjs scripts/tests/skill-prefetch.test.mjs scripts/tests/reactive-compact.test.mjs
     if ($LASTEXITCODE -ne 0) { throw "Claude source recovery and security tests failed" }
     & node scripts/build-cli.mjs --list-features
     if ($LASTEXITCODE -ne 0) { throw "Claude compile-time feature discovery failed" }
@@ -93,10 +93,16 @@ try {
     }
     Write-Host "Original donor source audit: imported=$donorImported, preserved=$donorPreserved, reviewed=$donorReviewed"
     $partialFeatures = @($manifest.optionalModuleAudit.PSObject.Properties |
-        Where-Object { $_.Value.status -ne 'source-present-runtime-not-proven' } |
+        Where-Object { $_.Value.status -eq 'partial-or-unavailable' } |
         ForEach-Object { $_.Name })
     if ($partialFeatures.Count -gt 0) {
-        Write-Warning ("CLAUDE PARTIAL FEATURES (not fully implemented): " + ($partialFeatures -join ', '))
+        Write-Warning ("CLAUDE UNAVAILABLE/PARTIAL FEATURES (compatibility only): " + ($partialFeatures -join ', '))
+    }
+    $reimplementedFeatures = @($manifest.optionalModuleAudit.PSObject.Properties |
+        Where-Object { $_.Value.status -eq 'local-reimplementation-not-original' } |
+        ForEach-Object { $_.Name })
+    if ($reimplementedFeatures.Count -gt 0) {
+        Write-Warning ("CLAUDE LOCALLY REIMPLEMENTED (not original private code; end-to-end feature validation pending): " + ($reimplementedFeatures -join ', '))
     }
 } finally {
     Pop-Location
