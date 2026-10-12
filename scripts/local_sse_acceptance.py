@@ -197,6 +197,33 @@ def main() -> int:
                 err_thread.join(timeout=2)
             returncode = process.returncode
 
+        # A --version fast-path can work while the actual CLI import is broken.
+        # Probe --help (full CLI import) and one-shot text print only after FAIL.
+        control_probes = {}
+        if not finished:
+            for label, argv in (
+                ("help", ["--help"]),
+                ("text_print", ["--print", "Reply with " + MARKER,
+                                "--model", "jarvis-local-stub"]),
+            ):
+                try:
+                    with tempfile.TemporaryDirectory(prefix="jarvis-cli-probe-") as probe_cwd:
+                        probe = subprocess.run(
+                            [args.node, str(args.cli.resolve()), *argv],
+                            cwd=probe_cwd, env=env, stdin=subprocess.DEVNULL,
+                            capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", timeout=25,
+                        )
+                    control_probes[label] = {
+                        "exit_code": probe.returncode,
+                        "stdout_len": len(probe.stdout),
+                        "stdout_prefix": probe.stdout[:300].replace("jarvis-local", "[LOCAL]"),
+                        "stderr_len": len(probe.stderr),
+                        "stderr_prefix": probe.stderr[:300].replace("jarvis-local", "[LOCAL]"),
+                    }
+                except subprocess.TimeoutExpired:
+                    control_probes[label] = {"timed_out": True}
+
         # Structured evidence: no credentials or arbitrary request bodies.
         completed = [m for m in messages if m.get("type") == "result"]
         ok = (
@@ -213,6 +240,7 @@ def main() -> int:
             "stdin_kept_open_until_result": finished,
             "timed_out": timed_out,
             "stdin_error": stdin_error,
+            "control_probes": control_probes,
             "fixture_requests": Fixture.requests_seen,
             "fixture_paths": Fixture.request_paths[:12],
             "stdout_len": sum(len(x.encode("utf-8")) for x in stdout_lines),
