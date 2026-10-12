@@ -4,7 +4,7 @@
 param(
     [string]$ClaudeRepo = 'https://github.com/diablomike20/claude-code-source-build.git',
     [string]$ClaudeBranch = 'feature/jarvis-nextgen-working-runtime-20261011',
-    [string]$ClaudeCommit = '4bbdf7dc99e485cd17e6128433bcbc52ce426aca'
+    [string]$ClaudeCommit = '2bc2a9e7d083ab203ed22cbf0624a9092a421ff5'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -49,7 +49,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Claude source-map security tests failed" }
     & node scripts/build-cli.mjs --list-features
     if ($LASTEXITCODE -ne 0) { throw "Claude compile-time feature discovery failed" }
-    & node scripts/build-cli.mjs --max-features
+    # CI-only diagnostics; normal installer packaging remains minified.
+    if ($env:JARVIS_CLAUDE_UNMINIFIED -eq '1') {
+        & node scripts/build-cli.mjs --max-features --no-minify
+    } else {
+        & node scripts/build-cli.mjs --max-features
+    }
     if ($LASTEXITCODE -ne 0) { throw "Maximum Claude Code build failed" }
     $manifest = Get-Content (Join-Path $source 'dist\claude-feature-manifest.json') -Raw | ConvertFrom-Json
     if ($manifest.buildStatus -ne 'built-not-runtime-tested') {
