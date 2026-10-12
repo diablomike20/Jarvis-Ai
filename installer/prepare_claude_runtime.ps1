@@ -4,11 +4,14 @@
 param(
     [string]$ClaudeRepo = 'https://github.com/diablomike20/claude-code-source-build.git',
     [string]$ClaudeBranch = 'feature/jarvis-nextgen-working-runtime-20261011',
-    [string]$ClaudeCommit = '79deec80d38ca99ab02412f6757aaedc0758840a'
+    [string]$ClaudeCommit = '87c8935ba6c94832ca4a4b07333fecfcdff2f0e3',
+    [string]$DonorRepo = 'https://github.com/diablomike20/claude-code.git',
+    [string]$DonorCommit = '6ee4529f1f62631c70c948b6e654ba95668d0c6e'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $root '.build-cache\claude-code-source-build'
+$donor = Join-Path $root '.build-cache\claude-code-donor'
 $dest = Join-Path $root 'runtime\claude-code\dist'
 $nodeDest = Join-Path $root 'runtime\node\node.exe'
 
@@ -41,12 +44,30 @@ if ($LASTEXITCODE -ne 0) { throw "Cannot checkout expected Claude commit $Claude
 $actualCommit = (& git -C $source rev-parse HEAD).Trim()
 if ($actualCommit -ne $ClaudeCommit) { throw "Wrong source commit: $actualCommit" }
 
+# The user's claude-code repository is an original source donor.
+# Check out its immutable SHA; never replace actual source with guessed stubs.
+if (Test-Path (Join-Path $donor '.git')) {
+    $donorDirty = & git -C $donor status --porcelain
+    if ($donorDirty) { throw "Original Claude donor contains local changes: $donor" }
+    & git -C $donor fetch origin main
+    if ($LASTEXITCODE -ne 0) { throw "Original source donor fetch failed" }
+} else {
+    & git clone --single-branch --branch main $DonorRepo $donor
+    if ($LASTEXITCODE -ne 0) { throw "Original source donor clone failed" }
+}
+& git -C $donor checkout --detach $DonorCommit
+if ($LASTEXITCODE -ne 0) { throw "Cannot checkout original source commit $DonorCommit" }
+$actualDonorCommit = (& git -C $donor rev-parse HEAD).Trim()
+if ($actualDonorCommit -ne $DonorCommit) { throw "Original source donor commit mismatch" }
+$originalDonorSrcEnv = $env:JARVIS_CLAUDE_DONOR_SRC
+$env:JARVIS_CLAUDE_DONOR_SRC = Join-Path $donor 'src'
+
 Push-Location $source
 try {
     & node --check scripts/build-cli.mjs
     if ($LASTEXITCODE -ne 0) { throw "Claude builder syntax invalid" }
-    & node --test scripts/tests/build-safety.test.mjs
-    if ($LASTEXITCODE -ne 0) { throw "Claude source-map security tests failed" }
+    & node --test scripts/tests/build-safety.test.mjs scripts/tests/donor-source.test.mjs scripts/tests/proactive-runtime.test.mjs
+    if ($LASTEXITCODE -ne 0) { throw "Claude source recovery and security tests failed" }
     & node scripts/build-cli.mjs --list-features
     if ($LASTEXITCODE -ne 0) { throw "Claude compile-time feature discovery failed" }
     # CI-only diagnostics; normal installer packaging remains minified.
@@ -60,8 +81,23 @@ try {
     if ($manifest.buildStatus -ne 'built-not-runtime-tested') {
         throw "Unexpected Claude feature manifest state"
     }
+    if ($manifest.originalSourceRecovery.status -ne 'pinned-donor-applied' -or
+        $manifest.originalSourceRecovery.commit -ne $actualDonorCommit) {
+        throw "Source donor verification failed: original Claude files were not reviewed"
+    }
+    $partialFeatures = @($manifest.optionalModuleAudit.PSObject.Properties |
+        Where-Object { $_.Value.status -ne 'source-present-runtime-not-proven' } |
+        ForEach-Object { $_.Name })
+    if ($partialFeatures.Count -gt 0) {
+        Write-Warning ("CLAUDE PARTIAL FEATURES (not fully implemented): " + ($partialFeatures -join ', '))
+    }
 } finally {
     Pop-Location
+    if ([string]::IsNullOrEmpty($originalDonorSrcEnv)) {
+        Remove-Item Env:JARVIS_CLAUDE_DONOR_SRC -ErrorAction SilentlyContinue
+    } else {
+        $env:JARVIS_CLAUDE_DONOR_SRC = $originalDonorSrcEnv
+    }
 }
 
 if (-not (Test-Path (Join-Path $source 'dist\cli.js'))) { throw "CLI output missing" }
@@ -79,6 +115,8 @@ Copy-Item -Force $nodeSource $nodeDest
     sourceRepository = $ClaudeRepo
     sourceBranch = $ClaudeBranch
     sourceCommit = $actualCommit
+    originalSourceRepository = $DonorRepo
+    originalSourceCommit = $actualDonorCommit
     nodeVersion = ((& node --version).Trim())
     featureManifest = 'claude-feature-manifest.json'
 } | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $dest 'brahma-source-provenance.json')
@@ -86,4 +124,5 @@ Copy-Item -Force $nodeSource $nodeDest
 Write-Host "Reconstructed Claude Code bundled at: $dest"
 Write-Host "Node bundled at: $nodeDest"
 Write-Host "Compile feature manifest: $(Join-Path $dest 'claude-feature-manifest.json')"
+Write-Host "Original Claude donor SHA verified: $actualDonorCommit"
 Write-Host "NEXT: Set BRAHMA_REQUIRE_CLAUDE_BUNDLE=1 then run pyinstaller installer/BrahmaEvo.spec"
