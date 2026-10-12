@@ -131,7 +131,7 @@ def main() -> int:
         finished = False
         timed_out = False
         stdin_error = ""
-        with tempfile.TemporaryDirectory(prefix="jarvis-local-cli-") as cwd:
+        with tempfile.TemporaryDirectory(prefix="jarvis-local-cli-", ignore_cleanup_errors=True) as cwd:
             process = subprocess.Popen(
                 [args.node, str(args.cli.resolve()), "--print", "--verbose",
                  "--input-format", "stream-json", "--output-format", "stream-json",
@@ -209,7 +209,7 @@ def main() -> int:
                                 "--model", "jarvis-local-stub"]),
             ):
                 try:
-                    with tempfile.TemporaryDirectory(prefix="jarvis-cli-probe-") as probe_cwd:
+                    with tempfile.TemporaryDirectory(prefix="jarvis-cli-probe-", ignore_cleanup_errors=True) as probe_cwd:
                         probe = subprocess.run(
                             [args.node, str(args.cli.resolve()), *argv],
                             cwd=probe_cwd, env=env, stdin=subprocess.DEVNULL,
