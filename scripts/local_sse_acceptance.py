@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import queue
+import re
 import time
 import subprocess
 import sys
@@ -225,6 +226,29 @@ def main() -> int:
                 except subprocess.TimeoutExpired:
                     control_probes[label] = {"timed_out": True}
 
+        # In a debug-only unminified build, the stack points to an exact
+        # generated bundle line. Expose only a few source-code lines (never
+        # environment settings, HTTP headers or request bodies).
+        failure_code_context = []
+        stack_text = "".join(stderr_lines)
+        locations = re.findall(r"cli\\.js:(\\d+):(\\d+)", stack_text)
+        bundle_code = args.cli.resolve().parent / "cli.bundle" / "src" / "entrypoints" / "cli.js"
+        if locations and bundle_code.is_file():
+            target_line = int(locations[0][0])
+            low, high = max(1, target_line - 3), target_line + 3
+            if 0 < target_line < 5_000_000:
+                try:
+                    with bundle_code.open("r", encoding="utf-8", errors="replace") as code:
+                        for line_no, body in enumerate(code, 1):
+                            if low <= line_no <= high:
+                                failure_code_context.append({
+                                    "line": line_no, "code": body.strip()[:240],
+                                })
+                            if line_no >= high:
+                                break
+                except OSError:
+                    failure_code_context = [{"note": "bundle read unavailable"}]
+
         # Structured evidence: no credentials or arbitrary request bodies.
         completed = [m for m in messages if m.get("type") == "result"]
         ok = (
@@ -241,6 +265,7 @@ def main() -> int:
             "stdin_kept_open_until_result": finished,
             "timed_out": timed_out,
             "stdin_error": stdin_error,
+            "failure_code_context": failure_code_context,
             "control_probes": control_probes,
             "fixture_requests": Fixture.requests_seen,
             "fixture_paths": Fixture.request_paths[:12],
