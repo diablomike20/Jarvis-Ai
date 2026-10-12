@@ -113,6 +113,7 @@ def main() -> int:
             "DISABLE_TELEMETRY": "1",
             "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
             "CI": "1",
+            "JARVIS_CLI_BOOT_TRACE": "1",
         })
         env.pop("OPENROUTER_API_KEY", None)
         packet = json.dumps({
