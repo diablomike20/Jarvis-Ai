@@ -105,7 +105,7 @@ def main() -> int:
         env.update({
             "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{server.server_port}",
             "ANTHROPIC_AUTH_TOKEN": "jarvis-local",
-            "ANTHROPIC_API_KEY": "",
+            "ANTHROPIC_API_KEY": "jarvis-local-fixture-only",
             "ANTHROPIC_MODEL": "jarvis-local-stub",
             "ANTHROPIC_DEFAULT_SONNET_MODEL": "jarvis-local-stub",
             "ANTHROPIC_DEFAULT_OPUS_MODEL": "jarvis-local-stub",
