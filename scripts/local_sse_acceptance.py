@@ -231,7 +231,7 @@ def main() -> int:
         # environment settings, HTTP headers or request bodies).
         failure_code_context = []
         stack_text = "".join(stderr_lines)
-        locations = re.findall(r"cli\\.js:(\\d+):(\\d+)", stack_text)
+        locations = re.findall(r"cli[.]js:([0-9]+):([0-9]+)", stack_text)
         bundle_code = args.cli.resolve().parent / "cli.bundle" / "src" / "entrypoints" / "cli.js"
         if locations and bundle_code.is_file():
             target_line = int(locations[0][0])
