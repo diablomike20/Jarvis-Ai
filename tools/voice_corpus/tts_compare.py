@@ -93,6 +93,18 @@ def load_f5(args):
             "Maxdorger29/f5-tts-hungarian.")
     try:
         import soundfile as sf
+        import torch
+        import torchaudio
+        # The Hungarian F5 model's published example uses this compatibility shim.
+        # torch/torchaudio stay in the separate, isolated F5 venv.
+        def _patched_audio_load(path, **kwargs):
+            data, sample_rate = sf.read(str(path), dtype="float32")
+            if data.ndim == 1:
+                data = data[None, :]
+            else:
+                data = data.T
+            return torch.from_numpy(data), sample_rate
+        torchaudio.load = _patched_audio_load
         from f5_tts.api import F5TTS
     except ImportError as exc:
         raise RuntimeError("Install F5-TTS dependencies in an isolated Python environment.") from exc
