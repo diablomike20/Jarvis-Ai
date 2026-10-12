@@ -4,7 +4,7 @@
 param(
     [string]$ClaudeRepo = 'https://github.com/diablomike20/claude-code-source-build.git',
     [string]$ClaudeBranch = 'feature/jarvis-nextgen-working-runtime-20261011',
-    [string]$ClaudeCommit = 'a0ff42e25f01e9d1122f0580df3148dcf573e8fa',
+    [string]$ClaudeCommit = '664c70527367df1ad1e168196e432a070f11fe4d',
     [string]$DonorRepo = 'https://github.com/diablomike20/claude-code.git',
     [string]$DonorCommit = '6ee4529f1f62631c70c948b6e654ba95668d0c6e'
 )
